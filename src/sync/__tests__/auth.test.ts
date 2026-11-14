@@ -30,6 +30,33 @@ describe('getCachedSession', () => {
     expect(await getCachedSession()).toEqual({ userId: 'u1', email: 'a@b.c' });
   });
 
+  it('returns the owner immediately when offline without calling getSession', async () => {
+    await meta.setOwner('u1', 'a@b.c');
+    localStorage.setItem('lift-auth', '{}');
+    auth.getSession.mockReturnValue(new Promise(() => undefined));
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    try {
+      expect(await getCachedSession()).toEqual({ userId: 'u1', email: 'a@b.c' });
+      expect(auth.getSession).not.toHaveBeenCalled();
+    } finally {
+      online.mockRestore();
+    }
+  });
+
+  it('falls back to the owner after a timeout when online but getSession hangs', async () => {
+    await meta.setOwner('u1', 'a@b.c');
+    localStorage.setItem('lift-auth', '{}');
+    auth.getSession.mockReturnValue(new Promise(() => undefined));
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const pending = getCachedSession();
+      await vi.advanceTimersByTimeAsync(2500);
+      expect(await pending).toEqual({ userId: 'u1', email: 'a@b.c' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('adopts the session identity when the meta owner is missing', async () => {
     auth.getSession.mockResolvedValue({
       data: { session: { user: { id: 'u9', email: 'z@b.c' } } },

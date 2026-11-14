@@ -8,6 +8,7 @@ import {
 import { getSupabase, type LiftClient } from '../lib/supabase';
 import type { SyncStatus } from '../types/sync';
 import { pullAll } from './pull';
+import { AUTH_TIMEOUT_MS, TIMED_OUT, withTimeout } from './timeout';
 import { isNetworkError, OfflineError, pushOutbox } from './push';
 
 export type SyncReason = 'start' | 'visible' | 'online' | 'offline' | 'write' | 'signin' | 'manual';
@@ -50,9 +51,15 @@ export function createSyncEngine(deps: EngineDeps): SyncEngine {
       setStatus({ state: 'offline' });
       return;
     }
+    const previousState = status.state;
     setStatus({ state: 'syncing', lastError: undefined });
     try {
-      const { data, error } = await client.auth.getSession();
+      const sessionResult = await withTimeout(client.auth.getSession(), AUTH_TIMEOUT_MS);
+      if (sessionResult === TIMED_OUT) {
+        setStatus({ state: 'offline' });
+        return;
+      }
+      const { data, error } = sessionResult;
       if (error || !data.session) {
         setStatus({ state: 'error', lastError: 'Not signed in' });
         return;
@@ -80,7 +87,7 @@ export function createSyncEngine(deps: EngineDeps): SyncEngine {
       }
     } catch (err) {
       if (err instanceof OwnerChangedError) {
-        setStatus({ state: 'synced' });
+        setStatus({ state: previousState });
         return;
       }
       if (isNetworkError(err) || err instanceof OfflineError) {

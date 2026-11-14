@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '../../db/schema';
 import { enqueue, runWrite } from '../../db/repos/outbox';
-import { isInitialPullDone, setOwner, wipeLocalData } from '../../db/repos/meta';
+import { getOwner, isInitialPullDone, setOwner, wipeLocalData } from '../../db/repos/meta';
 import type { SyncStatus } from '../../types/sync';
 import { createSyncEngine } from '../engine';
 import { createFakeClient, exerciseRecord, exerciseRow, FakeServer } from './fakeClient';
@@ -136,5 +136,59 @@ describe('sync engine', () => {
     expect(seen.some((s) => s.state === 'syncing')).toBe(true);
     expect(seen.some((s) => s.pendingCount === 1)).toBe(true);
     expect(engine.getStatus()).toMatchObject({ state: 'synced', pendingCount: 0 });
+  });
+
+  it('treats a hanging getSession as offline and releases the sync lock', async () => {
+    let held = false;
+    let wasHeld = false;
+    Object.defineProperty(navigator, 'locks', {
+      configurable: true,
+      value: {
+        request: async (_name: string, fn: () => Promise<void>) => {
+          held = true;
+          wasHeld = true;
+          try {
+            return await fn();
+          } finally {
+            held = false;
+          }
+        },
+      },
+    });
+    const client = createFakeClient(server);
+    const hung = { ...client, auth: { getSession: () => new Promise<never>(() => undefined) } };
+    const engine = createSyncEngine({
+      client: hung as unknown as typeof client,
+      now: () => Date.now(),
+      isOnline: () => online,
+    });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const run = engine.syncNow('start');
+      await vi.advanceTimersByTimeAsync(2500);
+      await run;
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(engine.getStatus().state).toBe('offline');
+    expect(wasHeld).toBe(true);
+    expect(held).toBe(false);
+    Reflect.deleteProperty(navigator, 'locks');
+  });
+
+  it('restores the previous state when the owner changes mid-run', async () => {
+    online = false;
+    const engine = makeEngine();
+    await engine.syncNow('start');
+    expect(engine.getStatus().state).toBe('offline');
+    online = true;
+    await saveExercise('a');
+    server.onUpsert = async () => {
+      server.onUpsert = undefined;
+      await setOwner('u2', 'b@example.com');
+    };
+    await engine.syncNow('manual');
+    expect((await getOwner())?.userId).toBe('u2');
+    expect(engine.getStatus().state).toBe('offline');
   });
 });

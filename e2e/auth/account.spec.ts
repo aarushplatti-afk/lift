@@ -48,7 +48,7 @@ test('sign-out is blocked while changes are pending until the user confirms', as
 
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   const dialog = page.getByRole('dialog');
-  await expect(dialog).toContainText('unsynced changes');
+  await expect(dialog).toContainText(/unsynced change/);
   await expect(page.getByText(userA.email)).toBeVisible();
 
   await dialog.getByRole('button', { name: 'Cancel' }).click();

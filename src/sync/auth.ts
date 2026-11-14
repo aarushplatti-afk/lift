@@ -2,6 +2,7 @@ import { getOwner, setOwner, wipeLocalData } from '../db/repos/meta';
 import { countOutbox } from '../db/repos/outbox';
 import { getSupabase } from '../lib/supabase';
 import { getSyncEngine } from './engine';
+import { AUTH_TIMEOUT_MS, TIMED_OUT, withTimeout } from './timeout';
 
 export interface AuthIdentity {
   userId: string;
@@ -41,10 +42,15 @@ async function adoptIdentity(identity: AuthIdentity): Promise<void> {
 
 export async function getCachedSession(): Promise<AuthIdentity | null> {
   const owner = await getOwner();
+  const storedOwner = owner && hasStoredSession() ? owner : null;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false && storedOwner) {
+    return storedOwner;
+  }
   try {
-    const { data, error } = await getSupabase().auth.getSession();
-    const user = data.session?.user;
-    if (!error && user) {
+    const result = await withTimeout(getSupabase().auth.getSession(), AUTH_TIMEOUT_MS);
+    if (result === TIMED_OUT) return storedOwner;
+    const user = result.data.session?.user;
+    if (!result.error && user) {
       const identity = { userId: user.id, email: user.email ?? owner?.email ?? '' };
       if (owner?.userId !== identity.userId) await adoptIdentity(identity);
       return identity;
@@ -52,8 +58,7 @@ export async function getCachedSession(): Promise<AuthIdentity | null> {
   } catch {
     // Fall through to the cached owner rule below.
   }
-  if (owner && hasStoredSession()) return owner;
-  return null;
+  return storedOwner;
 }
 
 function friendlyError(error: { message: string; status?: number; code?: string }): string {
