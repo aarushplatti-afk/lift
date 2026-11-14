@@ -7,6 +7,8 @@ export interface SeedExercise {
   type: ExerciseType;
 }
 
+export const SEED_VERSION = 1;
+
 export const SEED_EXERCISES: readonly SeedExercise[] = [
   // Chest
   { name: 'Barbell Bench Press', muscleGroup: 'chest', equipment: 'barbell', type: 'weight_reps' },
@@ -164,4 +166,74 @@ export const SEED_EXERCISES: readonly SeedExercise[] = [
   { name: 'Running', muscleGroup: 'cardio', equipment: 'bodyweight', type: 'duration' },
   { name: 'Cycling', muscleGroup: 'cardio', equipment: 'machine', type: 'duration' },
   { name: 'Rowing Machine', muscleGroup: 'cardio', equipment: 'machine', type: 'duration' },
+  // Additions beyond PRD section 10
+  { name: 'Decline Bench Press', muscleGroup: 'chest', equipment: 'barbell', type: 'weight_reps' },
+  { name: 'Pec Deck', muscleGroup: 'chest', equipment: 'machine', type: 'weight_reps' },
+  { name: 'Incline Cable Fly', muscleGroup: 'chest', equipment: 'cable', type: 'weight_reps' },
+  { name: 'Pendlay Row', muscleGroup: 'back', equipment: 'barbell', type: 'weight_reps' },
+  { name: 'Rack Pull', muscleGroup: 'back', equipment: 'barbell', type: 'weight_reps' },
+  { name: 'Barbell Shrug', muscleGroup: 'back', equipment: 'barbell', type: 'weight_reps' },
+  { name: 'Chest-Supported Row', muscleGroup: 'back', equipment: 'machine', type: 'weight_reps' },
+  { name: 'Inverted Row', muscleGroup: 'back', equipment: 'bodyweight', type: 'bodyweight_reps' },
+  {
+    name: 'Back Extension',
+    muscleGroup: 'back',
+    equipment: 'bodyweight',
+    type: 'weighted_bodyweight',
+  },
+  { name: 'Front Raise', muscleGroup: 'shoulders', equipment: 'dumbbell', type: 'weight_reps' },
+  {
+    name: 'Reverse Pec Deck',
+    muscleGroup: 'shoulders',
+    equipment: 'machine',
+    type: 'weight_reps',
+  },
+  { name: 'EZ-Bar Curl', muscleGroup: 'biceps', equipment: 'barbell', type: 'weight_reps' },
+  {
+    name: 'Concentration Curl',
+    muscleGroup: 'biceps',
+    equipment: 'dumbbell',
+    type: 'weight_reps',
+  },
+  {
+    name: 'Cable Overhead Tricep Extension',
+    muscleGroup: 'triceps',
+    equipment: 'cable',
+    type: 'weight_reps',
+  },
+  { name: 'Bench Dip', muscleGroup: 'triceps', equipment: 'bodyweight', type: 'bodyweight_reps' },
+  { name: 'Smith Machine Squat', muscleGroup: 'quads', equipment: 'machine', type: 'weight_reps' },
+  { name: 'Step-Up', muscleGroup: 'quads', equipment: 'dumbbell', type: 'weight_reps' },
+  { name: 'Reverse Lunge', muscleGroup: 'quads', equipment: 'dumbbell', type: 'weight_reps' },
+  {
+    name: 'Nordic Hamstring Curl',
+    muscleGroup: 'hamstrings',
+    equipment: 'bodyweight',
+    type: 'bodyweight_reps',
+  },
+  {
+    name: 'Hip Abduction Machine',
+    muscleGroup: 'glutes',
+    equipment: 'machine',
+    type: 'weight_reps',
+  },
+  { name: 'Cable Pull-Through', muscleGroup: 'glutes', equipment: 'cable', type: 'weight_reps' },
+  {
+    name: 'Leg Press Calf Raise',
+    muscleGroup: 'calves',
+    equipment: 'machine',
+    type: 'weight_reps',
+  },
+  { name: 'Crunch', muscleGroup: 'core', equipment: 'bodyweight', type: 'bodyweight_reps' },
+  { name: 'Dead Bug', muscleGroup: 'core', equipment: 'bodyweight', type: 'bodyweight_reps' },
+  { name: 'Side Plank', muscleGroup: 'core', equipment: 'bodyweight', type: 'duration' },
+  { name: 'Power Clean', muscleGroup: 'full_body', equipment: 'barbell', type: 'weight_reps' },
+  {
+    name: 'Kettlebell Swing',
+    muscleGroup: 'full_body',
+    equipment: 'kettlebell',
+    type: 'weight_reps',
+  },
+  { name: 'Jump Rope', muscleGroup: 'cardio', equipment: 'other', type: 'duration' },
+  { name: 'Stair Climber', muscleGroup: 'cardio', equipment: 'machine', type: 'duration' },
 ];
