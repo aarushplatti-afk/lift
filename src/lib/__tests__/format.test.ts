@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { formatDurationShort, formatElapsed, formatPreviousSet, formatWeight } from '../format';
+import {
+  formatDurationShort,
+  formatElapsed,
+  formatLastUsed,
+  formatPreviousSet,
+  formatWeight,
+} from '../format';
 import { lbToKg } from '../units';
 import type { WorkoutSet } from '../../types/domain';
 
@@ -83,5 +89,47 @@ describe('formatPreviousSet', () => {
   it('formats duration', () => {
     expect(formatPreviousSet(set({ durationSec: 90 }), 'duration', 'kg')).toBe('1:30');
     expect(formatPreviousSet(set({}), 'duration', 'kg')).toBe('—');
+  });
+});
+
+describe('formatLastUsed', () => {
+  const at = (y: number, m: number, d: number, h = 12): number =>
+    new Date(y, m - 1, d, h).getTime();
+
+  it('handles never used and same day', () => {
+    expect(formatLastUsed(undefined, at(2026, 11, 14))).toBe('Never used');
+    expect(formatLastUsed(at(2026, 11, 14, 0), at(2026, 11, 14, 23))).toBe('Used today');
+  });
+
+  it('treats a future timestamp as today', () => {
+    expect(formatLastUsed(at(2026, 11, 15), at(2026, 11, 14))).toBe('Used today');
+  });
+
+  it('compares calendar days, not 24h spans', () => {
+    expect(formatLastUsed(at(2026, 11, 13, 23), at(2026, 11, 14, 1))).toBe('Used yesterday');
+  });
+
+  it('uses days for 2-6 days and weeks for 7-34 days', () => {
+    expect(formatLastUsed(at(2026, 11, 8), at(2026, 11, 14))).toBe('Used 6 days ago');
+    expect(formatLastUsed(at(2026, 11, 7), at(2026, 11, 14))).toBe('Used 1 week ago');
+    expect(formatLastUsed(at(2026, 11, 1), at(2026, 11, 14))).toBe('Used 1 week ago');
+    expect(formatLastUsed(at(2026, 10, 11), at(2026, 11, 14))).toBe('Used 4 weeks ago');
+  });
+
+  it('is exact across the US spring-forward and fall-back changes', () => {
+    expect(formatLastUsed(at(2026, 3, 7, 23), at(2026, 3, 9, 0))).toBe('Used 2 days ago');
+    expect(formatLastUsed(at(2026, 3, 8, 12), at(2026, 3, 9, 12))).toBe('Used yesterday');
+    expect(formatLastUsed(at(2026, 10, 31, 12), at(2026, 11, 2, 0))).toBe('Used 2 days ago');
+    expect(formatLastUsed(at(2026, 11, 1, 12), at(2026, 11, 2, 12))).toBe('Used yesterday');
+  });
+
+  it('shows a date from 35 days, with the year only when it differs', () => {
+    expect(formatLastUsed(at(2026, 10, 10), at(2026, 11, 14))).toBe('Used Oct 10');
+    expect(formatLastUsed(at(2025, 11, 2), at(2026, 1, 20))).toBe('Used Nov 2, 2025');
+  });
+
+  it('crosses a year boundary by calendar day', () => {
+    expect(formatLastUsed(at(2025, 12, 31, 23), at(2026, 1, 1, 1))).toBe('Used yesterday');
+    expect(formatLastUsed(at(2025, 12, 30), at(2026, 1, 2))).toBe('Used 3 days ago');
   });
 });

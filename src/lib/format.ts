@@ -49,3 +49,25 @@ export function formatDurationShort(ms: number): string {
   if (totalMin < 60) return `${totalMin}m`;
   return `${Math.floor(totalMin / 60)}h ${totalMin % 60}m`;
 }
+
+function dayNumber(ms: number): number {
+  const d = new Date(ms);
+  return Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
+}
+
+export function formatLastUsed(at: number | undefined, now: number): string {
+  if (at === undefined) return 'Never used';
+  const days = Math.max(0, dayNumber(now) - dayNumber(at));
+  if (days === 0) return 'Used today';
+  if (days === 1) return 'Used yesterday';
+  if (days < 7) return `Used ${days} days ago`;
+  if (days < 35) {
+    const weeks = Math.floor(days / 7);
+    return `Used ${weeks} ${weeks === 1 ? 'week' : 'weeks'} ago`;
+  }
+  const date = new Date(at);
+  const text = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return date.getFullYear() === new Date(now).getFullYear()
+    ? `Used ${text}`
+    : `Used ${text}, ${date.getFullYear()}`;
+}

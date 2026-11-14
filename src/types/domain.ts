@@ -75,6 +75,7 @@ export interface TemplateSet {
   type: SetType;
   targetReps?: number;
   targetWeightKg?: number;
+  targetDurationSec?: number;
 }
 
 export interface TemplateExercise {

@@ -8,6 +8,17 @@ export type SetPatch = {
   durationSec?: number | null;
 };
 
+export interface ExerciseContainer {
+  exercises: WorkoutExercise[];
+  updatedAt: number;
+}
+
+export interface WorkoutInit {
+  name?: string;
+  templateId?: string;
+  exercises?: WorkoutExercise[];
+}
+
 export interface OpsCtx {
   now: number;
   newId: () => string;
@@ -21,16 +32,20 @@ function renumber(exercises: WorkoutExercise[]): WorkoutExercise[] {
   }));
 }
 
-function withExercises(w: Workout, exercises: WorkoutExercise[], ctx: OpsCtx): Workout {
+function withExercises<W extends ExerciseContainer>(
+  w: W,
+  exercises: WorkoutExercise[],
+  ctx: OpsCtx,
+): W {
   return { ...w, exercises: renumber(exercises), updatedAt: ctx.now };
 }
 
-function mapExercise(
-  w: Workout,
+function mapExercise<W extends ExerciseContainer>(
+  w: W,
   weId: string,
   ctx: OpsCtx,
   fn: (we: WorkoutExercise) => WorkoutExercise,
-): Workout {
+): W {
   if (!w.exercises.some((we) => we.id === weId)) return w;
   return withExercises(
     w,
@@ -51,7 +66,11 @@ function cleanNotes(notes: string): string {
   return notes.trim().slice(0, NOTES_MAX);
 }
 
-export function addExercises(w: Workout, exerciseIds: readonly string[], ctx: OpsCtx): Workout {
+export function addExercises<W extends ExerciseContainer>(
+  w: W,
+  exerciseIds: readonly string[],
+  ctx: OpsCtx,
+): W {
   const added: WorkoutExercise[] = exerciseIds.map((exerciseId) => ({
     id: ctx.newId(),
     exerciseId,
@@ -61,7 +80,7 @@ export function addExercises(w: Workout, exerciseIds: readonly string[], ctx: Op
   return withExercises(w, [...w.exercises, ...added], ctx);
 }
 
-export function removeExercise(w: Workout, weId: string, ctx: OpsCtx): Workout {
+export function removeExercise<W extends ExerciseContainer>(w: W, weId: string, ctx: OpsCtx): W {
   return withExercises(
     w,
     w.exercises.filter((we) => we.id !== weId),
@@ -69,18 +88,23 @@ export function removeExercise(w: Workout, weId: string, ctx: OpsCtx): Workout {
   );
 }
 
-export function restoreExercise(
-  w: Workout,
+export function restoreExercise<W extends ExerciseContainer>(
+  w: W,
   we: WorkoutExercise,
   index: number,
   ctx: OpsCtx,
-): Workout {
+): W {
   const list = w.exercises.filter((e) => e.id !== we.id);
   list.splice(clampIndex(index, list.length), 0, we);
   return withExercises(w, list, ctx);
 }
 
-export function moveExercise(w: Workout, weId: string, dir: -1 | 1, ctx: OpsCtx): Workout {
+export function moveExercise<W extends ExerciseContainer>(
+  w: W,
+  weId: string,
+  dir: -1 | 1,
+  ctx: OpsCtx,
+): W {
   const from = w.exercises.findIndex((we) => we.id === weId);
   const to = from + dir;
   if (from < 0 || to < 0 || to >= w.exercises.length) return w;
@@ -91,7 +115,12 @@ export function moveExercise(w: Workout, weId: string, dir: -1 | 1, ctx: OpsCtx)
   return withExercises(w, list, ctx);
 }
 
-export function setExerciseNotes(w: Workout, weId: string, notes: string, ctx: OpsCtx): Workout {
+export function setExerciseNotes<W extends ExerciseContainer>(
+  w: W,
+  weId: string,
+  notes: string,
+  ctx: OpsCtx,
+): W {
   const text = cleanNotes(notes);
   return mapExercise(w, weId, ctx, (we) => {
     const next: WorkoutExercise = { ...we };
@@ -101,7 +130,7 @@ export function setExerciseNotes(w: Workout, weId: string, notes: string, ctx: O
   });
 }
 
-export function addSet(w: Workout, weId: string, ctx: OpsCtx): Workout {
+export function addSet<W extends ExerciseContainer>(w: W, weId: string, ctx: OpsCtx): W {
   return mapExercise(w, weId, ctx, (we) => {
     const last = we.sets[we.sets.length - 1];
     const next = emptySet(ctx);
@@ -122,13 +151,13 @@ function applyPatch(set: WorkoutSet, patch: SetPatch): WorkoutSet {
   return out;
 }
 
-function mapSet(
-  w: Workout,
+function mapSet<W extends ExerciseContainer>(
+  w: W,
   weId: string,
   setId: string,
   ctx: OpsCtx,
   fn: (s: WorkoutSet) => WorkoutSet,
-): Workout {
+): W {
   const found = w.exercises.some((we) => we.id === weId && we.sets.some((s) => s.id === setId));
   if (!found) return w;
   return mapExercise(w, weId, ctx, (we) => ({
@@ -137,13 +166,13 @@ function mapSet(
   }));
 }
 
-export function updateSet(
-  w: Workout,
+export function updateSet<W extends ExerciseContainer>(
+  w: W,
   weId: string,
   setId: string,
   patch: SetPatch,
   ctx: OpsCtx,
-): Workout {
+): W {
   return mapSet(w, weId, setId, ctx, (s) => applyPatch(s, patch));
 }
 
@@ -162,20 +191,25 @@ export function setCompleted(
   });
 }
 
-export function removeSet(w: Workout, weId: string, setId: string, ctx: OpsCtx): Workout {
+export function removeSet<W extends ExerciseContainer>(
+  w: W,
+  weId: string,
+  setId: string,
+  ctx: OpsCtx,
+): W {
   return mapExercise(w, weId, ctx, (we) => ({
     ...we,
     sets: we.sets.filter((s) => s.id !== setId),
   }));
 }
 
-export function restoreSet(
-  w: Workout,
+export function restoreSet<W extends ExerciseContainer>(
+  w: W,
   weId: string,
   set: WorkoutSet,
   index: number,
   ctx: OpsCtx,
-): Workout {
+): W {
   return mapExercise(w, weId, ctx, (we) => {
     const sets = we.sets.filter((s) => s.id !== set.id);
     sets.splice(clampIndex(index, sets.length), 0, set);
@@ -183,19 +217,24 @@ export function restoreSet(
   });
 }
 
-export function setSetType(
-  w: Workout,
+export function setSetType<W extends ExerciseContainer>(
+  w: W,
   weId: string,
   setId: string,
   type: SetType,
   ctx: OpsCtx,
-): Workout {
+): W {
   const current = w.exercises.find((we) => we.id === weId)?.sets.find((s) => s.id === setId);
   if (!current || current.type === type) return w;
   return mapSet(w, weId, setId, ctx, (s) => ({ ...s, type }));
 }
 
-export function setRestSeconds(w: Workout, weId: string, sec: number | null, ctx: OpsCtx): Workout {
+export function setRestSeconds<W extends ExerciseContainer>(
+  w: W,
+  weId: string,
+  sec: number | null,
+  ctx: OpsCtx,
+): W {
   const we = w.exercises.find((e) => e.id === weId);
   if (!we) return w;
   const next = sec === null ? undefined : clampRestSeconds(sec);
