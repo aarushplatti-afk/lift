@@ -1,8 +1,10 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
+import { DEFAULT_SETTINGS } from './db/repos/settings';
 import { useAuthStore } from './store/auth';
+import { useSettingsStore } from './store/settings';
 import { useSyncStore } from './store/sync';
 
 const syncNow = vi.fn(() => Promise.resolve());
@@ -37,6 +39,23 @@ beforeEach(() => {
   window.location.hash = '#/';
   syncNow.mockClear();
   useSyncStore.setState({ syncNow: () => syncNow() });
+});
+
+describe('App theme', () => {
+  it('does not write the theme mirror until settings are hydrated', () => {
+    localStorage.removeItem('lift.theme');
+    setAuth('signedIn', true);
+    useSettingsStore.setState({ hydrated: false });
+    render(<App />);
+    expect(localStorage.getItem('lift.theme')).toBeNull();
+    act(() => {
+      useSettingsStore.setState({
+        hydrated: true,
+        settings: { ...DEFAULT_SETTINGS, theme: 'light' },
+      });
+    });
+    expect(localStorage.getItem('lift.theme')).toBe('light');
+  });
 });
 
 describe('App gate', () => {

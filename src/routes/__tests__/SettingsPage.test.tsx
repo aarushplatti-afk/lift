@@ -1,8 +1,9 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SETTINGS } from '../../db/repos/settings';
+import { useToastStore } from '../../components/ui/toastStore';
 import { useSettingsStore } from '../../store/settings';
 import { useSyncStore } from '../../store/sync';
 import { SettingsPage } from '../SettingsPage';
@@ -54,6 +55,43 @@ describe('SettingsPage', () => {
     expect(await screen.findByText(/You have 3 unsynced changes/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Sign out anyway' }));
     expect(signOut).toHaveBeenNthCalledWith(2, { discardUnsynced: true });
+  });
+
+  it('shows an error toast when saving a setting fails', async () => {
+    update.mockRejectedValueOnce(new Error('quota'));
+    useToastStore.setState({ toast: null });
+    renderPage();
+    await userEvent.click(screen.getByRole('radio', { name: 'Light' }));
+    await waitFor(() => {
+      expect(useToastStore.getState().toast?.message).toBe("Couldn't save setting");
+    });
+  });
+
+  it('uses the singular for one unsynced change', async () => {
+    signOut.mockResolvedValueOnce({ ok: false, reason: 'unsynced', pendingCount: 1 });
+    renderPage();
+    await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    expect(await screen.findByText(/You have 1 unsynced change\./)).toBeInTheDocument();
+  });
+
+  it('ignores a second sign-out tap while one is in flight', async () => {
+    let resolve: (value: { ok: true }) => void = () => undefined;
+    signOut.mockReturnValueOnce(
+      new Promise((r) => {
+        resolve = r;
+      }),
+    );
+    renderPage();
+    const button = screen.getByRole('button', { name: 'Sign out' });
+    await userEvent.click(button);
+    expect(button).toBeDisabled();
+    await userEvent.click(button);
+    expect(signOut).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      resolve({ ok: true });
+      await Promise.resolve();
+    });
+    expect(button).toBeEnabled();
   });
 
   it('disables Sync now while offline', () => {

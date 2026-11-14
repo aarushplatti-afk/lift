@@ -8,6 +8,7 @@ import { Dialog } from '../components/ui/Dialog';
 import { Header } from '../components/ui/Header';
 import { IconButton } from '../components/ui/IconButton';
 import { SegmentedControl } from '../components/ui/SegmentedControl';
+import { useToastStore } from '../components/ui/toastStore';
 import { formatWeight } from '../lib/format';
 import { APP_VERSION } from '../lib/version';
 import { signOut } from '../sync/auth';
@@ -62,14 +63,34 @@ export function SettingsPage() {
   const identity = useAuthStore((s) => s.identity);
   const [blockedCount, setBlockedCount] = useState<number | null>(null);
 
+  const [signingOut, setSigningOut] = useState(false);
+
+  const saveSetting = (patch: Parameters<typeof update>[0]) => {
+    update(patch).catch(() => {
+      useToastStore.getState().show({ message: "Couldn't save setting" });
+    });
+  };
+
   const handleSignOut = async () => {
-    const result = await signOut({ discardUnsynced: false });
-    if (!result.ok) setBlockedCount(result.pendingCount);
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      const result = await signOut({ discardUnsynced: false });
+      if (!result.ok) setBlockedCount(result.pendingCount);
+    } finally {
+      setSigningOut(false);
+    }
   };
 
   const handleForceSignOut = async () => {
-    await signOut({ discardUnsynced: true });
-    setBlockedCount(null);
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await signOut({ discardUnsynced: true });
+      setBlockedCount(null);
+    } finally {
+      setSigningOut(false);
+    }
   };
 
   const syncDisabled = status.state === 'syncing' || status.state === 'offline';
@@ -108,7 +129,7 @@ export function SettingsPage() {
             options={UNIT_OPTIONS}
             value={settings.unit}
             onChange={(unit) => {
-              void update({ unit });
+              saveSetting({ unit });
             }}
           />
           <p className="text-body-sm text-secondary tabular-nums">
@@ -122,7 +143,7 @@ export function SettingsPage() {
             options={THEME_OPTIONS}
             value={settings.theme}
             onChange={(theme) => {
-              void update({ theme });
+              saveSetting({ theme });
             }}
           />
         </Section>
@@ -157,6 +178,7 @@ export function SettingsPage() {
           <Button
             variant="secondary"
             fullWidth
+            disabled={signingOut}
             onClick={() => {
               void handleSignOut();
             }}
@@ -179,12 +201,14 @@ export function SettingsPage() {
         }}
       >
         <p className="mb-4 text-body">
-          You have {blockedCount} unsynced changes. Signing out will discard them.
+          You have {blockedCount} unsynced {blockedCount === 1 ? 'change' : 'changes'}. Signing out
+          will discard them.
         </p>
         <div className="flex gap-2">
           <Button
             variant="secondary"
             fullWidth
+            disabled={signingOut}
             onClick={() => {
               setBlockedCount(null);
             }}
@@ -194,6 +218,7 @@ export function SettingsPage() {
           <Button
             variant="danger"
             fullWidth
+            disabled={signingOut}
             onClick={() => {
               void handleForceSignOut();
             }}

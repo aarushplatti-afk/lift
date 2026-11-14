@@ -49,11 +49,12 @@ function Shell() {
 function ConfiguredApp() {
   const status = useAuthStore((s) => s.status);
   const theme = useSettingsStore((s) => s.settings.theme);
+  const hydrated = useSettingsStore((s) => s.hydrated);
 
   useEffect(() => useAuthStore.getState().init(), []);
   useEffect(() => initSettingsStore(), []);
   useEffect(() => initSyncStore(), []);
-  useEffect(() => applyTheme(theme), [theme]);
+  useEffect(() => (hydrated ? applyTheme(theme) : undefined), [hydrated, theme]);
   useEffect(() => {
     if (status !== 'signedIn') return undefined;
     return startSyncTriggers(getSyncEngine(), getSupabase().auth);
