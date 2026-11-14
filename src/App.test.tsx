@@ -38,7 +38,10 @@ function setAuth(status: 'loading' | 'signedOut' | 'signedIn', initialPullDone: 
 beforeEach(() => {
   window.location.hash = '#/';
   syncNow.mockClear();
-  useSyncStore.setState({ syncNow: () => syncNow() });
+  useSyncStore.setState({
+    syncNow: () => syncNow(),
+    status: { state: 'synced', pendingCount: 0, failedCount: 0 },
+  });
 });
 
 describe('App theme', () => {
@@ -72,6 +75,22 @@ describe('App gate', () => {
     expect(screen.getByRole('heading', { name: /Setting up/ })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(syncNow).toHaveBeenCalled();
+  });
+
+  it('shows the sync error on the setup screen', () => {
+    setAuth('signedIn', false);
+    render(<App />);
+    act(() => {
+      useSyncStore.setState({
+        status: {
+          state: 'error',
+          pendingCount: 0,
+          failedCount: 0,
+          lastError: 'relation "public.exercises" does not exist',
+        },
+      });
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent(/exercises" does not exist/);
   });
 
   it('shows the tab bar and opens settings without it', async () => {
