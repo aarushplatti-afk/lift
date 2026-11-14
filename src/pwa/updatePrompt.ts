@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { registerSW } from 'virtual:pwa-register';
 import { create } from 'zustand';
+import { isWorkoutActive, useActiveWorkoutStore } from '../store/activeWorkout';
 
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
@@ -18,11 +19,6 @@ const useUpdateStore = create<UpdateState>(() => ({
 
 let updateSW: ((reload?: boolean) => Promise<void>) | null = null;
 let registered = false;
-
-// M3 replaces this with the active-workout store check.
-function isWorkoutActive(): boolean {
-  return false;
-}
 
 function watchForUpdates(registration: ServiceWorkerRegistration): void {
   const check = () => {
@@ -69,8 +65,9 @@ export function useUpdatePrompt(): {
   const needRefresh = useUpdateStore((s) => s.needRefresh);
   const dismissed = useUpdateStore((s) => s.dismissed);
   const offlineReady = useUpdateStore((s) => s.offlineReady);
+  const active = useActiveWorkoutStore(isWorkoutActive);
   return {
-    visible: needRefresh && !dismissed && !isWorkoutActive(),
+    visible: needRefresh && !dismissed && !active,
     offlineReady,
     apply,
     dismiss,

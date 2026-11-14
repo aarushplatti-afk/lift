@@ -1,4 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
+import type { Workout } from '../types/domain';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 interface Callbacks {
@@ -11,6 +12,17 @@ let callbacks: Callbacks = {};
 const registerSW = vi.fn((options: Callbacks) => {
   callbacks = options;
   return updateSW;
+});
+
+const workout = (): Workout => ({
+  id: 'w',
+  userId: 'u',
+  name: 'W',
+  startedAt: 1,
+  createdAt: 1,
+  updatedAt: 1,
+  status: 'in_progress',
+  exercises: [],
 });
 
 vi.mock('virtual:pwa-register', () => ({ registerSW }));
@@ -41,6 +53,24 @@ describe('useUpdatePrompt', () => {
     const { result } = await setup();
     act(() => {
       callbacks.onNeedRefresh?.();
+    });
+    expect(result.current.visible).toBe(true);
+  });
+
+  it('stays hidden while a workout is active or loading, and shows after finish', async () => {
+    const { result } = await setup();
+    const { useActiveWorkoutStore } = await import('../store/activeWorkout');
+    act(() => {
+      callbacks.onNeedRefresh?.();
+      useActiveWorkoutStore.setState({ status: 'loading' });
+    });
+    expect(result.current.visible).toBe(false);
+    act(() => {
+      useActiveWorkoutStore.setState({ status: 'ready', workout: workout() });
+    });
+    expect(result.current.visible).toBe(false);
+    act(() => {
+      useActiveWorkoutStore.setState({ workout: null });
     });
     expect(result.current.visible).toBe(true);
   });

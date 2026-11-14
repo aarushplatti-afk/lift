@@ -3,7 +3,18 @@ import { db } from '../schema';
 import { enqueue, runWrite } from '../repos/outbox';
 import { OwnerChangedError, setOwner } from '../repos/meta';
 import { applyServerRecords, getCursor, setCursor } from '../repos/syncApply';
-import type { BodyweightEntry, Exercise, Settings } from '../../types/domain';
+import type { BodyweightEntry, Exercise, Settings, Workout } from '../../types/domain';
+
+const wk = (id: string, name = 'W'): Workout => ({
+  userId: 'u1',
+  updatedAt: 1,
+  id,
+  name,
+  startedAt: 1,
+  status: 'in_progress',
+  exercises: [],
+  createdAt: 1,
+});
 
 const ex = (id: string, name = 'Squat', updatedAt = 1): Exercise => ({
   userId: 'u1',
@@ -114,6 +125,33 @@ describe('applyServerRecords', () => {
     );
     expect(await db.bodyweight.toArray()).toHaveLength(1);
     expect((await db.bodyweight.get('a'))?.weightKg).toBe(79);
+  });
+
+  it('skips the active workout for upserts and tombstones but applies others', async () => {
+    await db.workouts.put(wk('act', 'Local'));
+    await db.meta.put({ key: 'activeWorkoutId', value: 'act' });
+    const up = await applyServerRecords(
+      'workouts',
+      [
+        { record: wk('act', 'Server'), deleted: false },
+        { record: wk('other', 'Server'), deleted: false },
+      ],
+      'u1',
+    );
+    expect(up).toEqual({ applied: 1, skipped: 1 });
+    expect((await db.workouts.get('act'))?.name).toBe('Local');
+    expect(await db.workouts.get('other')).toBeDefined();
+    const del = await applyServerRecords(
+      'workouts',
+      [
+        { record: wk('act'), deleted: true },
+        { record: wk('other'), deleted: true },
+      ],
+      'u1',
+    );
+    expect(del).toEqual({ applied: 1, skipped: 1 });
+    expect(await db.workouts.get('act')).toBeDefined();
+    expect(await db.workouts.get('other')).toBeUndefined();
   });
 
   it('applies settings via the settings table', async () => {

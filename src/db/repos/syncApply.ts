@@ -13,7 +13,13 @@ export async function applyServerRecords<T extends SyncTable>(
     const local = db.table<SyncRecordMap[T], string>(localName);
     let applied = 0;
     let skipped = 0;
+    const activeRow = table === 'workouts' ? await db.meta.get('activeWorkoutId') : undefined;
+    const activeId = activeRow?.key === 'activeWorkoutId' ? activeRow.value : undefined;
     for (const { record, deleted } of items) {
+      if (activeId !== undefined && record.id === activeId) {
+        skipped += 1;
+        continue;
+      }
       const pending = await db.syncQueue
         .where('[table+recordId]')
         .equals([table, record.id])
