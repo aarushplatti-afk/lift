@@ -1,0 +1,64 @@
+import { act, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_SETTINGS } from '../../db/repos/settings';
+import { useSettingsStore } from '../../store/settings';
+import { useSyncStore } from '../../store/sync';
+import { SettingsPage } from '../SettingsPage';
+
+const signOut = vi.hoisted(() => vi.fn());
+vi.mock('../../sync/auth', () => ({ signOut }));
+
+const update = vi.fn().mockResolvedValue(undefined);
+
+function renderPage() {
+  return render(
+    <MemoryRouter>
+      <SettingsPage />
+    </MemoryRouter>,
+  );
+}
+
+beforeEach(() => {
+  signOut.mockReset();
+  update.mockClear();
+  useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, unit: 'lb' }, update });
+  useSyncStore.setState({ status: { state: 'synced', pendingCount: 0, failedCount: 0 } });
+});
+
+describe('SettingsPage', () => {
+  it('re-renders the formatted sample when the unit changes', async () => {
+    renderPage();
+    expect(screen.getByText(/Example: 100 kg = 220\.5 lb/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('radio', { name: 'kg' }));
+    expect(update).toHaveBeenCalledWith({ unit: 'kg' });
+    act(() => {
+      useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, unit: 'kg' } });
+    });
+    expect(screen.getByText(/Example: 100 kg = 100 kg/)).toBeInTheDocument();
+  });
+
+  it('calls update with the chosen theme', async () => {
+    renderPage();
+    await userEvent.click(screen.getByRole('radio', { name: 'Light' }));
+    expect(update).toHaveBeenCalledWith({ theme: 'light' });
+  });
+
+  it('confirms before discarding unsynced changes on sign out', async () => {
+    signOut.mockResolvedValueOnce({ ok: false, reason: 'unsynced', pendingCount: 3 });
+    signOut.mockResolvedValueOnce({ ok: true });
+    renderPage();
+    await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    expect(signOut).toHaveBeenNthCalledWith(1, { discardUnsynced: false });
+    expect(await screen.findByText(/You have 3 unsynced changes/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Sign out anyway' }));
+    expect(signOut).toHaveBeenNthCalledWith(2, { discardUnsynced: true });
+  });
+
+  it('disables Sync now while offline', () => {
+    useSyncStore.setState({ status: { state: 'offline', pendingCount: 2, failedCount: 0 } });
+    renderPage();
+    expect(screen.getByRole('button', { name: 'Sync now' })).toBeDisabled();
+  });
+});
