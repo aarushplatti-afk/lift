@@ -13,6 +13,7 @@ import { ProgressTab } from './routes/ProgressTab';
 import { SettingsPage } from './routes/SettingsPage';
 import { ActiveWorkout } from './routes/WorkoutTab/ActiveWorkout';
 import { Summary } from './routes/WorkoutTab/Summary';
+import { TemplateEditor } from './routes/WorkoutTab/Templates/TemplateEditor';
 import { WorkoutHome } from './routes/WorkoutTab/WorkoutHome';
 import { isSupabaseConfigured, getSupabase } from './lib/supabase';
 import { applyTheme } from './lib/theme';
@@ -30,6 +31,7 @@ function Layout() {
   const inWorkoutFlow = pathname.startsWith('/workout/');
   const showTabs =
     !inWorkoutFlow &&
+    !pathname.startsWith('/templates/') &&
     pathname !== '/settings' &&
     pathname !== '/exercises/new' &&
     !/^\/exercises\/[^/]+\/edit$/.test(pathname);
@@ -56,6 +58,8 @@ function Shell() {
           <Route index element={<WorkoutHome />} />
           <Route path="workout/active" element={<ActiveWorkout />} />
           <Route path="workout/summary/:id" element={<Summary />} />
+          <Route path="templates/new" element={<TemplateEditor />} />
+          <Route path="templates/:id/edit" element={<TemplateEditor />} />
           <Route path="history" element={<HistoryTab />} />
           <Route path="progress" element={<ProgressTab />} />
           <Route path="exercises" element={<ExerciseList />} />
