@@ -1,5 +1,6 @@
 import Dexie, { type Table } from 'dexie';
 import type { BodyweightEntry, Exercise, Settings, Template, Workout } from '../types/domain';
+import type { RestTimerSnapshot } from './repos/meta';
 import type { OutboxEntry, SyncState, SyncTable } from '../types/sync';
 
 export type MetaRow =
@@ -7,7 +8,8 @@ export type MetaRow =
   | { key: 'ownerEmail'; value: string }
   | { key: 'initialPullDone'; value: boolean }
   | { key: 'seedVersion'; value: number }
-  | { key: 'activeWorkoutId'; value: string };
+  | { key: 'activeWorkoutId'; value: string }
+  | { key: 'restTimer'; value: RestTimerSnapshot };
 export type MetaKey = MetaRow['key'];
 
 export class LiftDB extends Dexie {

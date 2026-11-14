@@ -1,4 +1,5 @@
-import type { Workout, WorkoutExercise, WorkoutSet } from '../types/domain';
+import type { SetType, Workout, WorkoutExercise, WorkoutSet } from '../types/domain';
+import { clampRestSeconds } from './calc/rest';
 import { NAME_MAX, NOTES_MAX } from './exercises';
 
 export type SetPatch = {
@@ -179,6 +180,31 @@ export function restoreSet(
     const sets = we.sets.filter((s) => s.id !== set.id);
     sets.splice(clampIndex(index, sets.length), 0, set);
     return { ...we, sets };
+  });
+}
+
+export function setSetType(
+  w: Workout,
+  weId: string,
+  setId: string,
+  type: SetType,
+  ctx: OpsCtx,
+): Workout {
+  const current = w.exercises.find((we) => we.id === weId)?.sets.find((s) => s.id === setId);
+  if (!current || current.type === type) return w;
+  return mapSet(w, weId, setId, ctx, (s) => ({ ...s, type }));
+}
+
+export function setRestSeconds(w: Workout, weId: string, sec: number | null, ctx: OpsCtx): Workout {
+  const we = w.exercises.find((e) => e.id === weId);
+  if (!we) return w;
+  const next = sec === null ? undefined : clampRestSeconds(sec);
+  if (we.restSeconds === next) return w;
+  return mapExercise(w, weId, ctx, (e) => {
+    const out: WorkoutExercise = { ...e };
+    delete out.restSeconds;
+    if (next !== undefined) out.restSeconds = next;
+    return out;
   });
 }
 

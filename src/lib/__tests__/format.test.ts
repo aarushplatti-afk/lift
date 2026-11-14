@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { formatDurationShort, formatElapsed, formatWeight } from '../format';
+import { formatDurationShort, formatElapsed, formatPreviousSet, formatWeight } from '../format';
+import { lbToKg } from '../units';
+import type { WorkoutSet } from '../../types/domain';
 
 describe('formatElapsed', () => {
   it('formats mm:ss under an hour', () => {
@@ -39,5 +41,47 @@ describe('formatWeight', () => {
   it('still formats weights', () => {
     expect(formatWeight(undefined, 'kg')).toBe('—');
     expect(formatWeight(100, 'kg', { withUnit: true })).toBe('100 kg');
+  });
+});
+
+describe('formatPreviousSet', () => {
+  const set = (over: Partial<WorkoutSet>): WorkoutSet => ({
+    id: 's',
+    order: 0,
+    type: 'normal',
+    completed: true,
+    ...over,
+  });
+  it('shows a dash when there is no set', () => {
+    expect(formatPreviousSet(undefined, 'weight_reps', 'lb')).toBe('—');
+  });
+  it('formats weight_reps in lb and kg', () => {
+    const s = set({ weightKg: lbToKg(135), reps: 5 });
+    expect(formatPreviousSet(s, 'weight_reps', 'lb')).toBe('135 × 5');
+    expect(formatPreviousSet(set({ weightKg: 60, reps: 5 }), 'weight_reps', 'kg')).toBe('60 × 5');
+  });
+  it('shows dashes for missing weight_reps fields', () => {
+    expect(formatPreviousSet(set({ reps: 5 }), 'weight_reps', 'kg')).toBe('— × 5');
+    expect(formatPreviousSet(set({ weightKg: 60 }), 'weight_reps', 'kg')).toBe('60 × —');
+  });
+  it('formats bodyweight_reps', () => {
+    expect(formatPreviousSet(set({ reps: 10 }), 'bodyweight_reps', 'kg')).toBe('BW × 10');
+    expect(formatPreviousSet(set({}), 'bodyweight_reps', 'kg')).toBe('BW × —');
+  });
+  it('formats weighted_bodyweight with added weight only when above 0', () => {
+    expect(formatPreviousSet(set({ weightKg: 20, reps: 8 }), 'weighted_bodyweight', 'kg')).toBe(
+      '+20 × 8',
+    );
+    expect(
+      formatPreviousSet(set({ weightKg: lbToKg(45), reps: 8 }), 'weighted_bodyweight', 'lb'),
+    ).toBe('+45 × 8');
+    expect(formatPreviousSet(set({ weightKg: 0, reps: 8 }), 'weighted_bodyweight', 'kg')).toBe(
+      'BW × 8',
+    );
+    expect(formatPreviousSet(set({ reps: 8 }), 'weighted_bodyweight', 'kg')).toBe('BW × 8');
+  });
+  it('formats duration', () => {
+    expect(formatPreviousSet(set({ durationSec: 90 }), 'duration', 'kg')).toBe('1:30');
+    expect(formatPreviousSet(set({}), 'duration', 'kg')).toBe('—');
   });
 });

@@ -2,6 +2,7 @@ import { liveQuery, type Observable } from 'dexie';
 import { db } from '../schema';
 import { enqueue, runWrite } from './outbox';
 import { requireUserId } from './meta';
+import { clampRestSeconds } from '../../lib/calc/rest';
 import type { Settings, SettingsData } from '../../types/domain';
 
 export const DEFAULT_SETTINGS: SettingsData = {
@@ -19,9 +20,6 @@ export const DEFAULT_SETTINGS: SettingsData = {
 
 export type SettingsPatch = Partial<Omit<SettingsData, 'schemaVersion'>>;
 
-const REST_MIN = 15;
-const REST_MAX = 600;
-const REST_STEP = 15;
 const GOAL_MAX_KG = 700;
 
 function toData(row: Settings): SettingsData {
@@ -48,8 +46,7 @@ function sanitize(data: SettingsData): SettingsData {
   ) {
     throw new RangeError(`bodyweightGoalKg must be between 0 and ${GOAL_MAX_KG} kg`);
   }
-  const stepped = Math.round(data.defaultRestSeconds / REST_STEP) * REST_STEP;
-  return { ...data, defaultRestSeconds: Math.min(REST_MAX, Math.max(REST_MIN, stepped)) };
+  return { ...data, defaultRestSeconds: clampRestSeconds(data.defaultRestSeconds) };
 }
 
 export async function getSettings(): Promise<SettingsData> {

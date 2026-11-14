@@ -1,6 +1,12 @@
 import { liveQuery, type Observable } from 'dexie';
 import { db } from '../schema';
 
+export interface RestTimerSnapshot {
+  workoutId: string;
+  endsAt: number;
+  durationSec: number;
+}
+
 export async function getOwner(): Promise<{ userId: string; email: string } | undefined> {
   const [id, email] = await Promise.all([db.meta.get('ownerUserId'), db.meta.get('ownerEmail')]);
   if (id?.key !== 'ownerUserId' || email?.key !== 'ownerEmail') return undefined;
@@ -40,6 +46,16 @@ export function observeInitialPullDone(): Observable<boolean> {
 
 export async function setInitialPullDone(v: boolean): Promise<void> {
   await db.meta.put({ key: 'initialPullDone', value: v });
+}
+
+export async function getRestTimer(): Promise<RestTimerSnapshot | undefined> {
+  const row = await db.meta.get('restTimer');
+  return row?.key === 'restTimer' ? row.value : undefined;
+}
+
+export async function setRestTimer(s: RestTimerSnapshot | null): Promise<void> {
+  if (s === null) await db.meta.delete('restTimer');
+  else await db.meta.put({ key: 'restTimer', value: s });
 }
 
 export async function wipeLocalData(): Promise<void> {

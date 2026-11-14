@@ -1,4 +1,5 @@
-import type { Unit } from '../types/domain';
+import type { ExerciseType, Unit, WorkoutSet } from '../types/domain';
+import { formatDurationInput } from './duration';
 import { toDisplay } from './units';
 
 export function formatWeight(
@@ -9,6 +10,27 @@ export function formatWeight(
   if (kg === undefined) return '—';
   const text = toDisplay(kg, unit).toFixed(1).replace(/\.0$/, '');
   return opts?.withUnit ? `${text} ${unit}` : text;
+}
+
+export function formatPreviousSet(
+  set: WorkoutSet | undefined,
+  type: ExerciseType,
+  unit: Unit,
+): string {
+  if (!set) return '—';
+  const reps = set.reps === undefined ? '—' : String(set.reps);
+  switch (type) {
+    case 'weight_reps':
+      return `${formatWeight(set.weightKg, unit)} × ${reps}`;
+    case 'bodyweight_reps':
+      return `BW × ${reps}`;
+    case 'weighted_bodyweight':
+      return set.weightKg !== undefined && set.weightKg > 0
+        ? `+${formatWeight(set.weightKg, unit)} × ${reps}`
+        : `BW × ${reps}`;
+    case 'duration':
+      return set.durationSec === undefined ? '—' : formatDurationInput(set.durationSec);
+  }
 }
 
 const pad2 = (n: number): string => String(n).padStart(2, '0');
