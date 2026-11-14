@@ -25,6 +25,15 @@ export async function isInitialPullDone(): Promise<boolean> {
   return row?.key === 'initialPullDone' && row.value;
 }
 
+export async function getSeedVersion(): Promise<number> {
+  const row = await db.meta.get('seedVersion');
+  return row?.key === 'seedVersion' ? row.value : 0;
+}
+
+export async function setSeedVersion(v: number): Promise<void> {
+  await db.meta.put({ key: 'seedVersion', value: v });
+}
+
 export function observeInitialPullDone(): Observable<boolean> {
   return liveQuery(isInitialPullDone);
 }
