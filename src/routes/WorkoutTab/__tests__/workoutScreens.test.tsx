@@ -229,6 +229,21 @@ describe('ActiveWorkout', () => {
     }
   });
 
+  it('clearing the name and blurring restores the original name', async () => {
+    const user = userEvent.setup();
+    await startStore();
+    renderApp();
+    await user.click(screen.getByRole('button', { name: 'Start Empty Workout' }));
+    const name = await screen.findByLabelText('Workout name');
+    const original = (name as HTMLInputElement).value;
+    await user.clear(name);
+    await user.tab();
+    expect(screen.getByLabelText('Workout name')).toHaveValue(original);
+    await waitFor(async () => {
+      expect((await db.workouts.toArray())[0]?.name).toBe(original);
+    });
+  });
+
   it('minimize flushes and returns home with the banner', async () => {
     const user = userEvent.setup();
     await startStore();

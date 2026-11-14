@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { ExerciseCard } from '../../components/workout/ExerciseCard';
 import { ExercisePicker } from '../../components/workout/ExercisePicker';
@@ -21,8 +21,9 @@ const EMPTY_TYPES: ExerciseTypes = new Map();
 function WorkoutTitle({ name }: { name: string }) {
   const rename = useActiveWorkoutStore((s) => s.rename);
   const [draft, setDraft] = useState<string | null>(null);
+  const originalRef = useRef(name);
   const commit = () => {
-    if (draft !== null) rename(draft);
+    if (draft !== null) rename(draft.trim() === '' ? originalRef.current : draft);
     setDraft(null);
   };
   const handleChange = (value: string) => {
@@ -36,6 +37,7 @@ function WorkoutTitle({ name }: { name: string }) {
       maxLength={NAME_MAX}
       value={draft ?? name}
       onFocus={() => {
+        originalRef.current = name;
         setDraft(name);
       }}
       onChange={(e) => {

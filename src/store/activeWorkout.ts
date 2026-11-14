@@ -222,9 +222,14 @@ export const useActiveWorkoutStore = create<ActiveWorkoutState>((set, get) => {
     flush: flushNow,
 
     async finish(opts) {
-      const w = get().workout;
+      let w = get().workout;
       if (!w) return { status: 'empty' };
       await settleBeforeRepo(w);
+      const latest = get().workout;
+      if (latest && latest !== w && latest.id === w.id) {
+        w = latest;
+        await settleBeforeRepo(w);
+      }
       let outcome: FinishOutcome;
       try {
         outcome = await finishWorkout(w, opts);
