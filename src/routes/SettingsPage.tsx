@@ -8,8 +8,14 @@ import { Dialog } from '../components/ui/Dialog';
 import { Header } from '../components/ui/Header';
 import { IconButton } from '../components/ui/IconButton';
 import { SegmentedControl } from '../components/ui/SegmentedControl';
+import { Stepper } from '../components/ui/Stepper';
+import { Toggle } from '../components/ui/Toggle';
 import { useToastStore } from '../components/ui/toastStore';
+import { REST_MAX_SEC, REST_MIN_SEC, REST_STEP_SEC } from '../lib/calc/rest';
+import { formatDurationInput } from '../lib/duration';
 import { formatWeight } from '../lib/format';
+import { isVibrationSupported } from '../lib/platform/haptics';
+import { isWakeLockSupported } from '../lib/platform/wakeLock';
 import { APP_VERSION } from '../lib/version';
 import { signOut } from '../sync/auth';
 import { useAuthStore } from '../store/auth';
@@ -144,6 +150,57 @@ export function SettingsPage() {
             value={settings.theme}
             onChange={(theme) => {
               saveSetting({ theme });
+            }}
+          />
+        </Section>
+
+        <Section title="Workout">
+          <Stepper
+            label="Default rest time"
+            value={settings.defaultRestSeconds}
+            min={REST_MIN_SEC}
+            max={REST_MAX_SEC}
+            step={REST_STEP_SEC}
+            format={formatDurationInput}
+            onChange={(defaultRestSeconds) => {
+              saveSetting({ defaultRestSeconds });
+            }}
+          />
+          <Toggle
+            label="Auto-start rest timer"
+            checked={settings.restTimerAutoStart}
+            onChange={(restTimerAutoStart) => {
+              saveSetting({ restTimerAutoStart });
+            }}
+          />
+          <Toggle
+            label="Sound"
+            description="Chime when rest ends. Muted by the silent switch on iPhone."
+            checked={settings.soundEnabled}
+            onChange={(soundEnabled) => {
+              saveSetting({ soundEnabled });
+            }}
+          />
+          {isVibrationSupported() && (
+            <Toggle
+              label="Haptics"
+              checked={settings.hapticsEnabled}
+              onChange={(hapticsEnabled) => {
+                saveSetting({ hapticsEnabled });
+              }}
+            />
+          )}
+          <Toggle
+            label="Keep screen awake"
+            description={
+              isWakeLockSupported()
+                ? 'While the workout screen is open.'
+                : 'Not supported in this browser.'
+            }
+            disabled={!isWakeLockSupported()}
+            checked={settings.keepScreenAwakeDuringWorkout}
+            onChange={(keepScreenAwakeDuringWorkout) => {
+              saveSetting({ keepScreenAwakeDuringWorkout });
             }}
           />
         </Section>

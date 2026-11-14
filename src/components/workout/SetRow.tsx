@@ -11,7 +11,7 @@ import {
   type InvalidField,
 } from '../../lib/calc/validation';
 import type { SetPatch } from '../../lib/workoutOps';
-import type { ExerciseType, Unit, WorkoutSet } from '../../types/domain';
+import type { ExerciseType, SetType, Unit, WorkoutSet } from '../../types/domain';
 import { SET_COL, SET_ROW_LAYOUT } from './setColumns';
 
 interface SetRowProps {
@@ -22,7 +22,17 @@ interface SetRowProps {
   onChange: (patch: SetPatch) => void;
   onToggle: () => CompleteResult;
   onBadge: () => void;
+  badge: string;
+  previousText: string;
+  onFillPrevious?: () => void;
 }
+
+const TYPE_SUFFIX: Record<SetType, string> = {
+  normal: '',
+  warmup: ', warm-up',
+  drop: ', drop set',
+  failure: ', failure',
+};
 
 const INVALID_MESSAGE: Record<InvalidField, string> = {
   weight: 'Enter a weight',
@@ -55,7 +65,18 @@ function CheckIcon() {
   );
 }
 
-export function SetRow({ set, index, type, unit, onChange, onToggle, onBadge }: SetRowProps) {
+export function SetRow({
+  set,
+  index,
+  type,
+  unit,
+  onChange,
+  onToggle,
+  onBadge,
+  badge,
+  previousText,
+  onFillPrevious,
+}: SetRowProps) {
   const n = index + 1;
   const weightRef = useRef<HTMLInputElement>(null);
   const repsRef = useRef<HTMLInputElement>(null);
@@ -121,17 +142,30 @@ export function SetRow({ set, index, type, unit, onChange, onToggle, onBadge }: 
       <div className={`${SET_ROW_LAYOUT} min-h-[52px]`}>
         <button
           type="button"
-          aria-label={`Set ${n} options`}
+          aria-label={`Set ${n} options${TYPE_SUFFIX[set.type]}`}
           onClick={onBadge}
           className="-mx-1.5 flex h-11 w-11 shrink-0 items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         >
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-2 text-body-sm font-semibold tabular-nums text-primary">
-            {n}
+            {badge}
           </span>
         </button>
-        <span className={`${SET_COL.previous} truncate text-center text-body-sm text-secondary`}>
-          —
-        </span>
+        {onFillPrevious ? (
+          <button
+            type="button"
+            aria-label={`Use previous: ${previousText}`}
+            onClick={onFillPrevious}
+            className={`${SET_COL.previous} min-h-tap truncate rounded-control text-center text-body-sm tabular-nums text-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent`}
+          >
+            {previousText}
+          </button>
+        ) : (
+          <span
+            className={`${SET_COL.previous} truncate text-center text-body-sm tabular-nums text-secondary`}
+          >
+            {previousText}
+          </span>
+        )}
         {usesWeight && (
           <NumberInput
             ref={weightRef}

@@ -1,22 +1,29 @@
 import { useEffect, useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { ExerciseCard } from '../../components/workout/ExerciseCard';
+import { RestTimerBar } from '../../components/workout/RestTimerBar';
 import { ExercisePicker } from '../../components/workout/ExercisePicker';
 import { Button } from '../../components/ui/Button';
 import { Dialog } from '../../components/ui/Dialog';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { IconButton } from '../../components/ui/IconButton';
+import { useLiveQuery } from '../../hooks/useLiveQuery';
 import { useNow } from '../../hooks/useNow';
+import { useWakeLock } from '../../hooks/useWakeLock';
+import { getLastCompletedWithExercises } from '../../db/repos/workouts';
 import { elapsedMs } from '../../lib/calc/duration';
 import type { ExerciseTypes } from '../../lib/calc/volume';
 import { NAME_MAX } from '../../lib/exercises';
 import { formatElapsed } from '../../lib/format';
 import { useActiveWorkoutStore } from '../../store/activeWorkout';
+import { useRestTimerStore } from '../../store/restTimer';
 import { useSettingsStore } from '../../store/settings';
+import type { Workout } from '../../types/domain';
 import { useFinishFlow } from './FinishFlow';
 import { toExerciseTypes, useExerciseMap } from './useExerciseMap';
 
 const EMPTY_TYPES: ExerciseTypes = new Map();
+const EMPTY_PREVIOUS: Map<string, Workout> = new Map();
 
 function WorkoutTitle({ name }: { name: string }) {
   const rename = useActiveWorkoutStore((s) => s.rename);
@@ -67,6 +74,16 @@ export function ActiveWorkout() {
   const workout = useActiveWorkoutStore((s) => s.workout);
   const addExercises = useActiveWorkoutStore((s) => s.addExercises);
   const unit = useSettingsStore((s) => s.settings.unit);
+  const keepAwake = useSettingsStore((s) => s.settings.keepScreenAwakeDuringWorkout);
+  const restPhase = useRestTimerStore((s) => s.phase);
+  const startedAt = workout?.startedAt ?? 0;
+  const idsKey = [...new Set(workout?.exercises.map((we) => we.exerciseId) ?? [])].sort().join('|');
+  const previousMap = useLiveQuery(
+    () => getLastCompletedWithExercises(idsKey === '' ? [] : idsKey.split('|'), startedAt),
+    [idsKey, startedAt],
+    EMPTY_PREVIOUS,
+  );
+  useWakeLock(keepAwake);
   const exerciseMap = useExerciseMap();
   const finishFlow = useFinishFlow(exerciseMap ? toExerciseTypes(exerciseMap) : EMPTY_TYPES);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -135,7 +152,11 @@ export function ActiveWorkout() {
         </div>
       </header>
 
-      <main className="flex flex-col gap-3 px-4 pb-6 pt-3">
+      <main
+        className={`flex flex-col gap-3 px-4 pt-3 ${
+          restPhase === 'idle' ? 'pb-6' : 'pb-[calc(88px+env(safe-area-inset-bottom))]'
+        }`}
+      >
         {exerciseMap !== null &&
           workout.exercises.map((we, i) => (
             <ExerciseCard
@@ -145,6 +166,7 @@ export function ActiveWorkout() {
               count={workout.exercises.length}
               exercise={exerciseMap.get(we.exerciseId)}
               unit={unit}
+              previous={previousMap.get(we.exerciseId)}
             />
           ))}
         {workout.exercises.length === 0 && (
@@ -211,6 +233,7 @@ export function ActiveWorkout() {
           </Button>
         </div>
       </Dialog>
+      <RestTimerBar />
       {finishFlow.dialogs}
     </>
   );

@@ -2,10 +2,30 @@ import { useState } from 'react';
 import { BottomSheet } from '../ui/BottomSheet';
 import { Button } from '../ui/Button';
 import { IconButton } from '../ui/IconButton';
+import { Stepper } from '../ui/Stepper';
+import { SwipeRow } from '../ui/SwipeRow';
 import { TextArea } from '../ui/TextArea';
+import { groupOrdinals, previousSetFor, setBadgeLabels } from '../../lib/calc/previous';
+import { REST_MAX_SEC, REST_MIN_SEC, REST_STEP_SEC } from '../../lib/calc/rest';
+import type { CompleteResult } from '../../lib/calc/validation';
+import { formatDurationInput } from '../../lib/duration';
 import { NOTES_MAX } from '../../lib/exercises';
+import { formatPreviousSet } from '../../lib/format';
+import { unlockChime } from '../../lib/platform/chime';
+import { HAPTIC_TAP, vibrate } from '../../lib/platform/haptics';
+import type { SetPatch } from '../../lib/workoutOps';
 import { useActiveWorkoutStore } from '../../store/activeWorkout';
-import type { Exercise, Unit, WorkoutExercise } from '../../types/domain';
+import { useRestTimerStore } from '../../store/restTimer';
+import { useSettingsStore } from '../../store/settings';
+import type {
+  Exercise,
+  ExerciseType,
+  SetType,
+  Unit,
+  Workout,
+  WorkoutExercise,
+  WorkoutSet,
+} from '../../types/domain';
 import { SetRow } from './SetRow';
 import { WorkoutSetTable } from './WorkoutSetTable';
 
@@ -15,11 +35,29 @@ interface ExerciseCardProps {
   count: number;
   exercise: Exercise | undefined;
   unit: Unit;
+  previous: Workout | undefined;
 }
 
 const DELETED_NAME = 'Deleted exercise';
 
-export function ExerciseCard({ we, index, count, exercise, unit }: ExerciseCardProps) {
+const SET_TYPE_OPTIONS: readonly { value: SetType; label: string }[] = [
+  { value: 'normal', label: 'Normal' },
+  { value: 'warmup', label: 'Warm-up' },
+  { value: 'drop', label: 'Drop set' },
+  { value: 'failure', label: 'Failure' },
+];
+
+function fillPatch(prev: WorkoutSet, type: ExerciseType): SetPatch {
+  const patch: SetPatch = {};
+  if ((type === 'weight_reps' || type === 'weighted_bodyweight') && prev.weightKg !== undefined) {
+    patch.weightKg = prev.weightKg;
+  }
+  if (type !== 'duration' && prev.reps !== undefined) patch.reps = prev.reps;
+  if (type === 'duration' && prev.durationSec !== undefined) patch.durationSec = prev.durationSec;
+  return patch;
+}
+
+export function ExerciseCard({ we, index, count, exercise, unit, previous }: ExerciseCardProps) {
   const addSet = useActiveWorkoutStore((s) => s.addSet);
   const updateSet = useActiveWorkoutStore((s) => s.updateSet);
   const toggleComplete = useActiveWorkoutStore((s) => s.toggleComplete);
@@ -27,20 +65,45 @@ export function ExerciseCard({ we, index, count, exercise, unit }: ExerciseCardP
   const removeExercise = useActiveWorkoutStore((s) => s.removeExercise);
   const moveExercise = useActiveWorkoutStore((s) => s.moveExercise);
   const setExerciseNotes = useActiveWorkoutStore((s) => s.setExerciseNotes);
+  const setSetType = useActiveWorkoutStore((s) => s.setSetType);
+  const setRestSeconds = useActiveWorkoutStore((s) => s.setRestSeconds);
+  const workoutId = useActiveWorkoutStore((s) => s.workout?.id);
+  const settings = useSettingsStore((s) => s.settings);
+  const startRest = useRestTimerStore((s) => s.start);
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteDraft, setNoteDraft] = useState<string | null>(null);
   const [badgeSetId, setBadgeSetId] = useState<string | null>(null);
+  const [restOpen, setRestOpen] = useState(false);
+  const [restDraft, setRestDraft] = useState(settings.defaultRestSeconds);
 
   const name = exercise?.name ?? DELETED_NAME;
   const type = exercise?.type ?? 'weight_reps';
   const notes = we.notes ?? '';
   const showNote = noteOpen || notes !== '';
   const badgeIndex = we.sets.findIndex((s) => s.id === badgeSetId);
+  const ordinals = groupOrdinals(we.sets);
+  const badges = setBadgeLabels(we.sets);
+  const restLabel =
+    we.restSeconds === undefined
+      ? `Default (${formatDurationInput(settings.defaultRestSeconds)})`
+      : formatDurationInput(we.restSeconds);
 
   const commitNote = () => {
     setNoteDraft(null);
+  };
+
+  const handleToggle = (setId: string): CompleteResult => {
+    const result = toggleComplete(we.id, setId, type);
+    if (result.ok && result.completed) {
+      unlockChime();
+      if (settings.hapticsEnabled) vibrate(HAPTIC_TAP);
+      if (settings.restTimerAutoStart && workoutId !== undefined) {
+        startRest(we.restSeconds ?? settings.defaultRestSeconds, workoutId);
+      }
+    }
+    return result;
   };
 
   return (
@@ -78,22 +141,42 @@ export function ExerciseCard({ we, index, count, exercise, unit }: ExerciseCardP
       )}
 
       <WorkoutSetTable type={type} unit={unit}>
-        {we.sets.map((s, i) => (
-          <SetRow
-            key={s.id}
-            set={s}
-            index={i}
-            type={type}
-            unit={unit}
-            onChange={(patch) => {
-              updateSet(we.id, s.id, patch);
-            }}
-            onToggle={() => toggleComplete(we.id, s.id, type)}
-            onBadge={() => {
-              setBadgeSetId(s.id);
-            }}
-          />
-        ))}
+        {we.sets.map((s, i) => {
+          const prev = previousSetFor(we.exerciseId, ordinals[i] ?? 0, s.type, previous);
+          const canFill = prev !== undefined && !s.completed;
+          return (
+            <SwipeRow
+              key={s.id}
+              deleteLabel={`Delete set ${String(i + 1)}`}
+              onDelete={() => {
+                removeSet(we.id, s.id);
+              }}
+            >
+              <SetRow
+                set={s}
+                index={i}
+                type={type}
+                unit={unit}
+                badge={badges[i] ?? String(i + 1)}
+                previousText={formatPreviousSet(prev, type, unit)}
+                onFillPrevious={
+                  canFill
+                    ? () => {
+                        updateSet(we.id, s.id, fillPatch(prev, type));
+                      }
+                    : undefined
+                }
+                onChange={(patch) => {
+                  updateSet(we.id, s.id, patch);
+                }}
+                onToggle={() => handleToggle(s.id)}
+                onBadge={() => {
+                  setBadgeSetId(s.id);
+                }}
+              />
+            </SwipeRow>
+          );
+        })}
       </WorkoutSetTable>
 
       <Button
@@ -146,6 +229,16 @@ export function ExerciseCard({ we, index, count, exercise, unit }: ExerciseCardP
           </Button>
           <Button
             variant="secondary"
+            onClick={() => {
+              setRestDraft(we.restSeconds ?? settings.defaultRestSeconds);
+              setRestOpen(true);
+              setMenuOpen(false);
+            }}
+          >
+            Rest timer: {restLabel}
+          </Button>
+          <Button
+            variant="secondary"
             className="text-danger"
             onClick={() => {
               setMenuOpen(false);
@@ -159,11 +252,36 @@ export function ExerciseCard({ we, index, count, exercise, unit }: ExerciseCardP
 
       <BottomSheet
         open={badgeSetId !== null && badgeIndex >= 0}
-        title={`Set ${badgeIndex + 1}`}
+        title={`Set ${String(badgeIndex + 1)}`}
         onClose={() => {
           setBadgeSetId(null);
         }}
       >
+        <div role="radiogroup" aria-label="Set type" className="mb-3 flex flex-col gap-2">
+          {SET_TYPE_OPTIONS.map((o) => {
+            const selected = we.sets[badgeIndex]?.type === o.value;
+            return (
+              <button
+                key={o.value}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => {
+                  if (badgeSetId !== null) setSetType(we.id, badgeSetId, o.value);
+                  setBadgeSetId(null);
+                }}
+                className={`flex min-h-tap items-center justify-between rounded-control border px-4 text-body focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+                  selected
+                    ? 'border-accent bg-accent-tint font-semibold'
+                    : 'border-border bg-surface-2'
+                }`}
+              >
+                <span>{o.label}</span>
+                {selected && <span aria-hidden="true">✓</span>}
+              </button>
+            );
+          })}
+        </div>
         <Button
           variant="secondary"
           fullWidth
@@ -175,6 +293,47 @@ export function ExerciseCard({ we, index, count, exercise, unit }: ExerciseCardP
         >
           Delete set
         </Button>
+      </BottomSheet>
+
+      <BottomSheet
+        open={restOpen}
+        title="Rest timer"
+        onClose={() => {
+          setRestOpen(false);
+        }}
+      >
+        <div className="flex flex-col gap-4">
+          <Stepper
+            label="Rest time"
+            value={restDraft}
+            min={REST_MIN_SEC}
+            max={REST_MAX_SEC}
+            step={REST_STEP_SEC}
+            format={formatDurationInput}
+            onChange={setRestDraft}
+          />
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              fullWidth
+              onClick={() => {
+                setRestSeconds(we.id, null);
+                setRestOpen(false);
+              }}
+            >
+              Use default
+            </Button>
+            <Button
+              fullWidth
+              onClick={() => {
+                setRestSeconds(we.id, restDraft);
+                setRestOpen(false);
+              }}
+            >
+              Done
+            </Button>
+          </div>
+        </div>
       </BottomSheet>
     </section>
   );
