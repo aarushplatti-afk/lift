@@ -1,9 +1,15 @@
+import path from 'node:path';
 import { defineConfig, mergeConfig } from 'vitest/config';
 import viteConfig from './vite.config';
 
 export default mergeConfig(
   viteConfig,
   defineConfig({
+    resolve: {
+      alias: {
+        'virtual:pwa-register': path.resolve(import.meta.dirname, 'src/test/pwa-register-stub.ts'),
+      },
+    },
     test: {
       globals: true,
       environment: 'jsdom',

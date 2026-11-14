@@ -1,4 +1,5 @@
 import { HashRouter, Outlet, Route, Routes, useLocation } from 'react-router-dom';
+import { UpdateToast } from './components/UpdateToast';
 import { TabBar } from './components/ui/TabBar';
 import { ToastHost } from './components/ui/Toast';
 import { ExercisesTab } from './routes/ExercisesTab';
@@ -17,6 +18,7 @@ function Layout() {
       <Outlet />
       {showTabs ? <TabBar /> : null}
       <ToastHost />
+      <UpdateToast />
     </div>
   );
 }
