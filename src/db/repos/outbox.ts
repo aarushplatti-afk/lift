@@ -47,7 +47,11 @@ export async function enqueue(
 
 export async function listDue(now: number, force: boolean): Promise<OutboxEntry[]> {
   const pending = await db.syncQueue.where('state').equals('pending').sortBy('id');
-  return force ? pending : pending.filter((e) => e.nextAttemptAt <= now);
+  if (force) return pending;
+  const dueKeys = new Set(
+    pending.filter((e) => e.nextAttemptAt <= now).map((e) => `${e.table}:${e.recordId}`),
+  );
+  return pending.filter((e) => dueKeys.has(`${e.table}:${e.recordId}`));
 }
 
 export async function removeEntries(ids: number[]): Promise<void> {

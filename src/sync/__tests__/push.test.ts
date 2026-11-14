@@ -168,4 +168,41 @@ describe('pushOutbox', () => {
     expect(res.pushed).toBe(1);
     expect(server.tables.exercises).toHaveLength(1);
   });
+
+  it('failed old entry + new due entry sends the latest payload, clears both, no replay', async () => {
+    await saveExercise(exerciseRecord('a', { name: 'old' }));
+    server.failWhen = () => 'boom';
+    const client = createFakeClient(server);
+    const now = Date.now();
+    await pushOutbox(client, { now, force: false });
+    server.failWhen = undefined;
+    server.upsertCalls.length = 0;
+    await saveExercise(exerciseRecord('a', { name: 'new' }));
+    const res = await pushOutbox(client, { now: now + 1000, force: false });
+    expect(res.pushed).toBe(1);
+    expect(server.upsertCalls).toHaveLength(1);
+    expect(server.upsertCalls[0]?.rows[0]?.name).toBe('new');
+    expect(await db.syncQueue.count()).toBe(0);
+    await pushOutbox(client, { now: now + 10_000_000, force: false });
+    expect(server.upsertCalls).toHaveLength(1);
+  });
+
+  it('delete in backoff + newer upsert sends only the upsert, clears both, no replay', async () => {
+    await saveExercise(exerciseRecord('a'));
+    await removeExercise('a');
+    server.failWhen = () => 'boom';
+    const client = createFakeClient(server);
+    const now = Date.now();
+    await pushOutbox(client, { now, force: false });
+    server.failWhen = undefined;
+    server.upsertCalls.length = 0;
+    await saveExercise(exerciseRecord('a', { name: 'new' }));
+    const res = await pushOutbox(client, { now: now + 1000, force: false });
+    expect(res.pushed).toBe(1);
+    expect(server.upsertCalls).toHaveLength(1);
+    expect(server.upsertCalls[0]?.rows[0]?.name).toBe('new');
+    expect(await db.syncQueue.count()).toBe(0);
+    await pushOutbox(client, { now: now + 10_000_000, force: false });
+    expect(server.upsertCalls).toHaveLength(1);
+  });
 });

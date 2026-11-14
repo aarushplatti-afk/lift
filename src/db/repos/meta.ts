@@ -38,3 +38,15 @@ export async function wipeLocalData(): Promise<void> {
     await Promise.all(db.tables.map((t) => t.clear()));
   });
 }
+
+export class OwnerChangedError extends Error {
+  constructor() {
+    super('Local owner changed during sync');
+    this.name = 'OwnerChangedError';
+  }
+}
+
+export async function assertOwner(userId: string): Promise<void> {
+  const row = await db.meta.get('ownerUserId');
+  if (row?.key !== 'ownerUserId' || row.value !== userId) throw new OwnerChangedError();
+}

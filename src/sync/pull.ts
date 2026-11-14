@@ -69,10 +69,10 @@ export async function pullTable(
     const rows = result.data ?? [];
     if (rows.length === 0) break;
     const items = rows.map((row) => fromRow(table, row as unknown as Tables<typeof table>));
-    await applyServerRecords(table, items as never);
+    await applyServerRecords(table, items as never, userId);
     const last = rows[rows.length - 1];
     if (!last) break;
-    await setCursor(table, last.updated_at, String(last[keyCol]));
+    await setCursor(table, last.updated_at, String(last[keyCol]), userId);
     total += rows.length;
     if (rows.length < pageSize) break;
   }

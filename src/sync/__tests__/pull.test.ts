@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '../../db/schema';
 import { enqueue, runWrite } from '../../db/repos/outbox';
-import { wipeLocalData } from '../../db/repos/meta';
+import { setOwner, wipeLocalData } from '../../db/repos/meta';
 import { getCursor } from '../../db/repos/syncApply';
 import { buildKeysetFilter, pullAll, pullTable } from '../pull';
 import { createFakeClient, exerciseRecord, exerciseRow, FakeServer } from './fakeClient';
@@ -10,6 +10,7 @@ let server: FakeServer;
 
 beforeEach(async () => {
   await wipeLocalData();
+  await setOwner('u1', 'a@b.c');
   server = new FakeServer();
 });
 

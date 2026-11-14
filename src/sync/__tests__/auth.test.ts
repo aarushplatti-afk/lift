@@ -30,6 +30,15 @@ describe('getCachedSession', () => {
     expect(await getCachedSession()).toEqual({ userId: 'u1', email: 'a@b.c' });
   });
 
+  it('adopts the session identity when the meta owner is missing', async () => {
+    auth.getSession.mockResolvedValue({
+      data: { session: { user: { id: 'u9', email: 'z@b.c' } } },
+      error: null,
+    });
+    expect(await getCachedSession()).toEqual({ userId: 'u9', email: 'z@b.c' });
+    expect(await meta.getOwner()).toEqual({ userId: 'u9', email: 'z@b.c' });
+  });
+
   it('returns null without a stored session', async () => {
     await meta.setOwner('u1', 'a@b.c');
     auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
@@ -58,6 +67,17 @@ describe('signIn', () => {
     expect(syncNow).toHaveBeenCalledWith('signin');
     wipe.mockRestore();
     set.mockRestore();
+  });
+
+  it('wipes when there is no owner, then sets the owner', async () => {
+    await db.syncState.put({ table: 'exercises', lastPulledAt: 'x', lastPulledKey: 'y' });
+    auth.signInWithPassword.mockResolvedValue({
+      data: { user: { id: 'new', email: 'n@b.c' } },
+      error: null,
+    });
+    await signIn('n@b.c', 'pw');
+    expect(await db.syncState.count()).toBe(0);
+    expect(await meta.getOwner()).toEqual({ userId: 'new', email: 'n@b.c' });
   });
 
   it('reports invalid credentials', async () => {

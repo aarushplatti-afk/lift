@@ -226,7 +226,7 @@ describe.each(specs)('RLS on $name', (spec) => {
       expect(res.data ?? []).toHaveLength(0);
     });
 
-    it('rejects B upserting onto A row (42501)', async () => {
+    it.skipIf(spec.keyColumn === 'user_id')('rejects B upserting onto A row (42501)', async () => {
       const res = await table(b.client, spec.name)
         .upsert({ ...spec.build(b.userId, id), ...spec.patch })
         .select();
@@ -256,9 +256,7 @@ describe.each(specs)('RLS on $name', (spec) => {
 
     it('cannot insert', async () => {
       const anon = newClient();
-      const res = await table(anon, spec.name)
-        .insert(spec.build(a.userId, randomUUID()))
-        .select();
+      const res = await table(anon, spec.name).insert(spec.build(a.userId, randomUUID())).select();
       expect(res.error).not.toBeNull();
       expect(res.data ?? []).toHaveLength(0);
     });

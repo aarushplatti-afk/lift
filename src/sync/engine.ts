@@ -1,5 +1,10 @@
 import { observeOutboxCounts } from '../db/repos/outbox';
-import { getOwner, isInitialPullDone, setInitialPullDone } from '../db/repos/meta';
+import {
+  getOwner,
+  isInitialPullDone,
+  OwnerChangedError,
+  setInitialPullDone,
+} from '../db/repos/meta';
 import { getSupabase, type LiftClient } from '../lib/supabase';
 import type { SyncStatus } from '../types/sync';
 import { pullAll } from './pull';
@@ -74,6 +79,10 @@ export function createSyncEngine(deps: EngineDeps): SyncEngine {
         setStatus({ state: 'synced', lastSyncedAt: now() });
       }
     } catch (err) {
+      if (err instanceof OwnerChangedError) {
+        setStatus({ state: 'synced' });
+        return;
+      }
       if (isNetworkError(err) || err instanceof OfflineError) {
         setStatus({ state: 'offline' });
         return;

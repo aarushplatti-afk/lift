@@ -26,13 +26,28 @@ function hasStoredSession(): boolean {
   }
 }
 
+function withSyncLock<T>(fn: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator === 'undefined' ? undefined : navigator.locks;
+  return locks ? locks.request('lift-sync', fn) : fn();
+}
+
+async function adoptIdentity(identity: AuthIdentity): Promise<void> {
+  await withSyncLock(async () => {
+    const owner = await getOwner();
+    if (owner?.userId !== identity.userId) await wipeLocalData();
+    await setOwner(identity.userId, identity.email);
+  });
+}
+
 export async function getCachedSession(): Promise<AuthIdentity | null> {
   const owner = await getOwner();
   try {
     const { data, error } = await getSupabase().auth.getSession();
     const user = data.session?.user;
     if (!error && user) {
-      return { userId: user.id, email: user.email ?? owner?.email ?? '' };
+      const identity = { userId: user.id, email: user.email ?? owner?.email ?? '' };
+      if (owner?.userId !== identity.userId) await adoptIdentity(identity);
+      return identity;
     }
   } catch {
     // Fall through to the cached owner rule below.
@@ -63,9 +78,7 @@ export async function signIn(email: string, password: string): Promise<SignInRes
     };
   }
   const identity: AuthIdentity = { userId: data.user.id, email: data.user.email ?? email };
-  const owner = await getOwner();
-  if (owner && owner.userId !== identity.userId) await wipeLocalData();
-  await setOwner(identity.userId, identity.email);
+  await adoptIdentity(identity);
   emit(identity);
   void getSyncEngine().syncNow('signin');
   return { ok: true };
@@ -83,8 +96,9 @@ export async function signOut(opts: { discardUnsynced: boolean }): Promise<SignO
   if (pendingCount > 0 && !opts.discardUnsynced) {
     return { ok: false, reason: 'unsynced', pendingCount };
   }
-  await getSupabase().auth.signOut({ scope: 'local' });
-  await wipeLocalData();
+  const { error } = await getSupabase().auth.signOut({ scope: 'local' });
+  if (error) console.error('Supabase signOut failed; clearing local data anyway', error.message);
+  await withSyncLock(wipeLocalData);
   emit(null);
   return { ok: true };
 }
