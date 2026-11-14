@@ -378,4 +378,83 @@ describe('active workout store', () => {
     expect(save.mock.calls[0]?.[0].exercises[0]?.sets[0]?.reps).toBe(5);
     stop();
   });
+
+  it('setSetType and setRestSeconds go through mutate and no-op when unchanged', async () => {
+    await store().start({ exercises: [block(60, 8)] });
+    store().setSetType('we1', 's1', 'warmup');
+    expect(store().workout?.exercises[0]?.sets[0]?.type).toBe('warmup');
+    const before = store().workout;
+    store().setSetType('we1', 's1', 'warmup');
+    expect(store().workout).toBe(before);
+    store().setRestSeconds('we1', 100);
+    expect(store().workout?.exercises[0]?.restSeconds).toBe(105);
+    store().setRestSeconds('we1', null);
+    expect(store().workout?.exercises[0]?.restSeconds).toBeUndefined();
+    await store().flush();
+    expect((await db.workouts.get(store().workout?.id ?? ''))?.exercises[0]?.sets[0]?.type).toBe(
+      'warmup',
+    );
+  });
+
+  async function putWorkout(id: string): Promise<void> {
+    await db.workouts.put({
+      id,
+      userId: 'u1',
+      name: id,
+      startedAt: 1,
+      createdAt: 1,
+      updatedAt: 1,
+      status: 'in_progress',
+      exercises: [],
+    });
+  }
+
+  function gateSaves(): () => void {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    vi.spyOn(workoutsRepo, 'saveActiveWorkout').mockImplementation(async () => {
+      await gate;
+      return true;
+    });
+    return release;
+  }
+
+  it('two meta id changes during a slow flush end on the final id', async () => {
+    const stop = initActiveWorkoutStore();
+    await vi.waitFor(() => expect(store().status).toBe('ready'));
+    await store().start({ exercises: [block()] });
+    store().updateSet('we1', 's1', { reps: 2 });
+    await putWorkout('b');
+    await putWorkout('c');
+    const release = gateSaves();
+    await db.meta.put({ key: 'activeWorkoutId', value: 'b' });
+    await vi.waitFor(() => expect(workoutsRepo.saveActiveWorkout).toHaveBeenCalled());
+    await db.meta.put({ key: 'activeWorkoutId', value: 'c' });
+    await vi.advanceTimersByTimeAsync(0);
+    release();
+    await vi.waitFor(() => expect(store().workout?.id).toBe('c'));
+    await vi.advanceTimersByTimeAsync(100);
+    expect(store().workout?.id).toBe('c');
+    stop();
+  });
+
+  it('an edit during the flush does not enqueue the incoming row', async () => {
+    const stop = initActiveWorkoutStore();
+    await vi.waitFor(() => expect(store().status).toBe('ready'));
+    await store().start({ exercises: [block()] });
+    store().updateSet('we1', 's1', { reps: 2 });
+    await putWorkout('b');
+    const release = gateSaves();
+    await db.meta.put({ key: 'activeWorkoutId', value: 'b' });
+    await vi.waitFor(() => expect(workoutsRepo.saveActiveWorkout).toHaveBeenCalled());
+    store().updateSet('we1', 's1', { reps: 3 });
+    release();
+    await vi.waitFor(() => expect(store().workout?.id).toBe('b'));
+    await vi.advanceTimersByTimeAsync(10000);
+    const queued = await db.syncQueue.toArray();
+    expect(queued.some((e) => e.recordId === 'b')).toBe(false);
+    stop();
+  });
 });

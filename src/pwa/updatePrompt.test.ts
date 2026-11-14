@@ -94,6 +94,24 @@ describe('useUpdatePrompt', () => {
     expect(result.current.visible).toBe(true);
   });
 
+  it('re-suppresses after sign out and back in while the store is idle', async () => {
+    const { result } = await setup();
+    const { useAuthStore } = await import('../store/auth');
+    const { useActiveWorkoutStore } = await import('../store/activeWorkout');
+    act(() => {
+      useAuthStore.setState({ status: 'signedIn' });
+      useActiveWorkoutStore.setState({ status: 'ready' });
+      useActiveWorkoutStore.setState({ status: 'idle' });
+      useAuthStore.setState({ status: 'signedOut' });
+      callbacks.onNeedRefresh?.();
+    });
+    expect(result.current.visible).toBe(true);
+    act(() => {
+      useAuthStore.setState({ status: 'signedIn' });
+    });
+    expect(result.current.visible).toBe(false);
+  });
+
   it('still prompts a signed-out user whose store never initialized', async () => {
     const { result } = await setup();
     const { useAuthStore } = await import('../store/auth');
