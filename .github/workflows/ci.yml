@@ -23,6 +23,10 @@ jobs:
         env:
           VITE_SUPABASE_URL: http://127.0.0.1:54321
           VITE_SUPABASE_ANON_KEY: placeholder
+      - name: Guard against leaked secrets
+        run: node scripts/check-dist-secrets.mjs dist
+        env:
+          VITE_SUPABASE_ANON_KEY: placeholder
 
   integration:
     name: integration
@@ -37,13 +41,13 @@ jobs:
       - run: npm ci
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 3.1.0
       - run: supabase start
       - name: RLS tests
         if: hashFiles('tests/rls/**') != ''
         run: npm run test:rls
       - name: E2E tests
-        if: hashFiles('e2e/**', 'tests/e2e/**') != ''
+        if: (success() || failure()) && hashFiles('e2e/**', 'tests/e2e/**') != ''
         run: |
           npx playwright install --with-deps chromium
           npm run e2e:local-supabase
