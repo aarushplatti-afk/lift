@@ -46,6 +46,31 @@ export async function readRemoteSettings(user: TestUser): Promise<Record<string,
   return (data?.data as Record<string, unknown> | undefined) ?? null;
 }
 
+export interface RemoteExercise {
+  id: string;
+  name: string;
+  is_custom: boolean;
+  archived: boolean;
+  deleted_at: string | null;
+}
+
+/** Reads every exercises row (including soft-deleted) for the user via a second signed-in client. */
+export async function readRemoteExercises(user: TestUser): Promise<RemoteExercise[]> {
+  const client = anonClient();
+  const { error: signInError } = await client.auth.signInWithPassword({
+    email: user.email,
+    password: user.password,
+  });
+  if (signInError) throw new Error(`second client sign-in failed: ${signInError.message}`);
+  const { data, error } = await client
+    .from('exercises')
+    .select('id,name,is_custom,archived,deleted_at')
+    .eq('user_id', user.id)
+    .limit(5000);
+  if (error) throw new Error(`exercises read failed: ${error.message}`);
+  return data as RemoteExercise[];
+}
+
 export async function signInUi(page: Page, user: TestUser): Promise<void> {
   await page.goto('./');
   await page.getByLabel('Email').fill(user.email);

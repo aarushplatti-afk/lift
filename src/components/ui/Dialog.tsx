@@ -1,5 +1,6 @@
-import { useEffect, useId, useRef } from 'react';
-import type { KeyboardEvent, ReactNode } from 'react';
+import { useId, useRef } from 'react';
+import type { ReactNode } from 'react';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 interface DialogProps {
   open: boolean;
@@ -8,44 +9,12 @@ interface DialogProps {
   children: ReactNode;
 }
 
-const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
-
 export function Dialog({ open, title, onClose, children }: DialogProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const previous = document.activeElement;
-    const panel = panelRef.current;
-    const first = panel?.querySelector<HTMLElement>(FOCUSABLE);
-    (first ?? panel)?.focus();
-    return () => {
-      if (previous instanceof HTMLElement) previous.focus();
-    };
-  }, [open]);
+  const onKeyDown = useFocusTrap(panelRef, { open, onClose });
 
   if (!open) return null;
-
-  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === 'Escape') {
-      e.stopPropagation();
-      onClose();
-      return;
-    }
-    if (e.key !== 'Tab' || !panelRef.current) return;
-    const items = Array.from(panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE));
-    const firstItem = items[0];
-    const lastItem = items[items.length - 1];
-    if (!firstItem || !lastItem) return;
-    if (e.shiftKey && document.activeElement === firstItem) {
-      e.preventDefault();
-      lastItem.focus();
-    } else if (!e.shiftKey && document.activeElement === lastItem) {
-      e.preventDefault();
-      firstItem.focus();
-    }
-  };
 
   return (
     <div

@@ -6,7 +6,7 @@ export type Row = Record<string, unknown> & { updated_at: string; user_id: strin
 
 interface Result {
   data: Row[] | null;
-  error: { message: string } | null;
+  error: { message: string; code?: string } | null;
 }
 
 const KEYSET = /^updated_at\.gt\."([^"]*)",and\(updated_at\.eq\."([^"]*)",(\w+)\.gt\."([^"]*)"\)$/;
@@ -27,6 +27,7 @@ export class FakeServer {
   selectCalls: { table: SyncTable; filter: string | undefined }[] = [];
   session: { user: { id: string } } | null = { user: { id: 'u1' } };
   onUpsert: (() => Promise<void>) | undefined;
+  enforceExerciseNameUnique = false;
 
   keyOf(table: SyncTable): 'id' | 'user_id' {
     return table === 'user_settings' ? 'user_id' : 'id';
@@ -42,12 +43,38 @@ export class FakeServer {
       : undefined;
   }
 
+  private nameConflicts(row: Row): boolean {
+    const live = (r: Row): boolean => !r.archived && (r.deleted_at ?? null) === null;
+    if (!live(row)) return false;
+    const key = String(row.name).toLowerCase();
+    return this.tables.exercises.some(
+      (r) =>
+        r.id !== row.id &&
+        r.user_id === row.user_id &&
+        live(r) &&
+        String(r.name).toLowerCase() === key,
+    );
+  }
+
   upsert(table: SyncTable, rows: Row[], onConflict: string): Result {
     this.upsertCalls.push({ table, rows, onConflict });
     const down = this.fail();
     if (down) return down;
     const message = this.failWhen?.(table, rows);
     if (message) return { data: null, error: { message } };
+    if (
+      table === 'exercises' &&
+      this.enforceExerciseNameUnique &&
+      rows.some((row) => this.nameConflicts(row))
+    ) {
+      return {
+        data: null,
+        error: {
+          code: '23505',
+          message: 'duplicate key value violates unique constraint "exercises_user_name_uniq"',
+        },
+      };
+    }
     for (const row of rows) {
       const stored: Row = { ...row, updated_at: this.clock };
       const idx = this.tables[table].findIndex((r) => r[onConflict] === row[onConflict]);

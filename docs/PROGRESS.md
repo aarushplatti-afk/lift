@@ -1,6 +1,6 @@
 # Lift — Progress Log
 
-Last updated: 2026-11-13. Branch: `m1-foundation`.
+Last updated: 2026-11-13. Branch: `m2-exercises`.
 
 ## Done
 - Step 0: repo created, PRD moved to docs/PRD.md, Claude Code config (CLAUDE.md, agents, settings, commands).
@@ -28,8 +28,18 @@ Last updated: 2026-11-13. Branch: `m1-foundation`.
 - `.env.local` created (P3). Owner created their account in the dashboard and set Auth URLs (P4, P5 part 1).
 - Setup screen now shows the sync error instead of silently retrying (the first sign-in hung on "Setting up…" because the tables did not exist yet; logs showed 404 on `/rest/v1/exercises`).
 
+- M1 device check passed on the owner's phone (install, settings persistence, offline relaunch, resync).
+- M2 Exercise library (branch `m2-exercises`, PR #3, spec docs/milestones/M2-spec.md):
+  - 2.1 exercises repo + helpers: normalized names, folded search, dedupe inside the write tx, archive vs delete, restore (`6656219`).
+  - 2.2/2.3a seed data (98 exercises, `SEED_VERSION` 1) and idempotent per-user `ensureSeeded` (`4abf90a`, `6ad892b`).
+  - 2.3b engine seeds after a successful push+pull, before `initialPullDone`; two-device convergence tests (`045ef4a`).
+  - 2.4 UI kit: SearchInput, Chip/ChipGroup, ListRow, BottomSheet, Select, TextArea, useFocusTrap (`a8c17e6`).
+  - 2.5 ExerciseForm + filter bar (`1b89279`); Exercises tab list/detail/form screens (`5e349c9`).
+  - 2.6 ExercisePicker sheet (`c43b12d`). 2.7 e2e: seed count, create/delete sync, second device (CI).
+  - Review fixes: clearing notes saves; archived rows editable despite a live same-name row; a seed failure no longer blocks setup.
+
 ## In progress
-- M1 device check on iPhone and Android (owner).
+- M2 merge + deploy, then owner device check.
 
 ## Blocked
 - Local Docker engine: WSL is not installed on the dev machine, so `supabase start` and `npm run test:rls` cannot run locally. RLS and e2e are verified in the CI `integration` job instead. Needs the owner to run `wsl --install --no-distribution` in an elevated PowerShell and reboot (Claude cannot elevate).
@@ -72,4 +82,9 @@ Last updated: 2026-11-13. Branch: `m1-foundation`.
   - Settings validation throws `RangeError`; only `defaultRestSeconds` is clamped.
   - Light theme = absence of the `dark` class on `<html>`.
   - `SyncReason` includes `'offline'`.
+- 2026-11-13, M2 decisions (chosen under the owner's blanket authorization; reversible):
+  - Built-in exercises: muscle group, equipment and notes editable; name and type locked; never hard-deleted.
+  - A custom exercise's type locks once it has been logged.
+  - The seed library is 98 exercises (PRD §10's 69 plus 29 common additions).
+  - E1–E7 in M2-spec §0 (no schema change; name normalization; collator sort; seeding skips names the user already has).
 - Defaults per PRD §16: lb, blue accent `#4F8CFF`, name "Lift".
