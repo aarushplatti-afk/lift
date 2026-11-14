@@ -11,7 +11,9 @@
     "lint": "eslint .",
     "test": "vitest run",
     "e2e": "playwright test",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "gen:types": "supabase gen types typescript --local > src/types/database.ts",
+    "generate-pwa-assets": "pwa-assets-generator"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.0",
