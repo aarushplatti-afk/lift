@@ -297,6 +297,29 @@ describe('active workout store', () => {
     expect(isWorkoutActive(store())).toBe(false);
   });
 
+  it('never reports ready before the existing active workout is loaded', async () => {
+    await db.workouts.put({
+      id: 'x',
+      userId: 'u1',
+      name: 'Existing',
+      startedAt: 1,
+      createdAt: 1,
+      updatedAt: 1,
+      status: 'in_progress',
+      exercises: [],
+    });
+    await db.meta.put({ key: 'activeWorkoutId', value: 'x' });
+    const seenAtReady: (string | null)[] = [];
+    const unsub = useActiveWorkoutStore.subscribe((s, prev) => {
+      if (s.status === 'ready' && prev.status !== 'ready') seenAtReady.push(s.workout?.id ?? null);
+    });
+    const stop = initActiveWorkoutStore();
+    await vi.waitFor(() => expect(store().status).toBe('ready'));
+    expect(seenAtReady).toEqual(['x']);
+    unsub();
+    stop();
+  });
+
   it('cleanup flushes pending edits', async () => {
     const stop = initActiveWorkoutStore();
     await vi.waitFor(() => expect(store().status).toBe('ready'));

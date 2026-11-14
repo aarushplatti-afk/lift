@@ -272,7 +272,22 @@ function sameId(row: Workout | undefined): boolean {
   return (row?.id ?? null) === (useActiveWorkoutStore.getState().workout?.id ?? null);
 }
 
-async function hydrate(): Promise<void> {
+let latestHydrate: Promise<void> = Promise.resolve();
+
+function hydrate(): Promise<void> {
+  latestHydrate = runHydrate();
+  return latestHydrate;
+}
+
+async function settleHydration(): Promise<void> {
+  let current: Promise<void>;
+  do {
+    current = latestHydrate;
+    await current.catch(() => undefined);
+  } while (current !== latestHydrate);
+}
+
+async function runHydrate(): Promise<void> {
   hydrateGen += 1;
   const gen = hydrateGen;
   if (sameId(await getActiveWorkout())) return;
@@ -289,6 +304,7 @@ export function initActiveWorkoutStore(): () => void {
   let stopped = false;
   void hydrate()
     .catch(() => undefined)
+    .then(settleHydration)
     .then(() => {
       if (!stopped) useActiveWorkoutStore.setState({ status: 'ready' });
     });
