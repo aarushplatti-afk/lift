@@ -1,3 +1,4 @@
+import { ensureSeeded } from '../db/seed';
 import { observeOutboxCounts } from '../db/repos/outbox';
 import {
   getOwner,
@@ -23,6 +24,7 @@ interface EngineDeps {
   client: LiftClient;
   now: () => number;
   isOnline: () => boolean;
+  seed: (userId: string) => Promise<number>;
 }
 
 export function createSyncEngine(deps: EngineDeps): SyncEngine {
@@ -75,8 +77,18 @@ export function createSyncEngine(deps: EngineDeps): SyncEngine {
         return;
       }
       await pullAll(client, owner.userId);
+      const seeded = await deps.seed(owner.userId);
       if (!(await isInitialPullDone())) await setInitialPullDone(true);
-      if (pushed.failed > 0) {
+      let failed = pushed.failed;
+      if (seeded > 0) {
+        const seedPush = await pushOutbox(client, { now: now(), force });
+        if (seedPush.offline) {
+          setStatus({ state: 'offline' });
+          return;
+        }
+        failed += seedPush.failed;
+      }
+      if (failed > 0) {
         setStatus({
           state: 'error',
           lastError: 'Some changes could not be synced and will be retried',
@@ -150,6 +162,7 @@ export function getSyncEngine(): SyncEngine {
     client: getSupabase(),
     now: () => Date.now(),
     isOnline: () => navigator.onLine,
+    seed: ensureSeeded,
   });
   return singleton;
 }

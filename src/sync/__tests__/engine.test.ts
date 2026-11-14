@@ -14,6 +14,7 @@ function makeEngine() {
     client: createFakeClient(server),
     now: () => Date.now(),
     isOnline: () => online,
+    seed: async () => 0,
   });
 }
 
@@ -161,6 +162,7 @@ describe('sync engine', () => {
       client: hung as unknown as typeof client,
       now: () => Date.now(),
       isOnline: () => online,
+      seed: async () => 0,
     });
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     try {
