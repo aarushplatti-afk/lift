@@ -77,7 +77,14 @@ export function createSyncEngine(deps: EngineDeps): SyncEngine {
         return;
       }
       await pullAll(client, owner.userId);
-      const seeded = await deps.seed(owner.userId);
+      let seeded = 0;
+      let seedError: string | undefined;
+      try {
+        seeded = await deps.seed(owner.userId);
+      } catch (err) {
+        if (err instanceof OwnerChangedError) throw err;
+        seedError = `Couldn't add built-in exercises: ${err instanceof Error ? err.message : String(err)}`;
+      }
       if (!(await isInitialPullDone())) await setInitialPullDone(true);
       let failed = pushed.failed;
       if (seeded > 0) {
@@ -88,7 +95,9 @@ export function createSyncEngine(deps: EngineDeps): SyncEngine {
         }
         failed += seedPush.failed;
       }
-      if (failed > 0) {
+      if (seedError) {
+        setStatus({ state: 'error', lastError: seedError, lastSyncedAt: now() });
+      } else if (failed > 0) {
         setStatus({
           state: 'error',
           lastError: 'Some changes could not be synced and will be retried',

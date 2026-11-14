@@ -62,16 +62,20 @@ export class FakeServer {
     if (down) return down;
     const message = this.failWhen?.(table, rows);
     if (message) return { data: null, error: { message } };
+    if (
+      table === 'exercises' &&
+      this.enforceExerciseNameUnique &&
+      rows.some((row) => this.nameConflicts(row))
+    ) {
+      return {
+        data: null,
+        error: {
+          code: '23505',
+          message: 'duplicate key value violates unique constraint "exercises_user_name_uniq"',
+        },
+      };
+    }
     for (const row of rows) {
-      if (table === 'exercises' && this.enforceExerciseNameUnique && this.nameConflicts(row)) {
-        return {
-          data: null,
-          error: {
-            code: '23505',
-            message: 'duplicate key value violates unique constraint "exercises_user_name_uniq"',
-          },
-        };
-      }
       const stored: Row = { ...row, updated_at: this.clock };
       const idx = this.tables[table].findIndex((r) => r[onConflict] === row[onConflict]);
       if (idx >= 0) this.tables[table][idx] = { ...this.tables[table][idx], ...stored };

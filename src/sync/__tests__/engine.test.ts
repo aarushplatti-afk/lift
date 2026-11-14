@@ -48,6 +48,26 @@ describe('sync engine', () => {
     expect(await isInitialPullDone()).toBe(true);
   });
 
+  it('still marks the initial pull done and reports an error when seeding throws', async () => {
+    const seed = vi
+      .fn<(userId: string) => Promise<number>>()
+      .mockRejectedValueOnce(new Error('quota exceeded'))
+      .mockResolvedValueOnce(0);
+    const engine = createSyncEngine({
+      client: createFakeClient(server),
+      now: () => Date.now(),
+      isOnline: () => online,
+      seed,
+    });
+    await engine.syncNow('start');
+    expect(await isInitialPullDone()).toBe(true);
+    expect(engine.getStatus().state).toBe('error');
+    expect(engine.getStatus().lastError).toBe("Couldn't add built-in exercises: quota exceeded");
+    await engine.syncNow('manual');
+    expect(seed).toHaveBeenCalledTimes(2);
+    expect(engine.getStatus().state).toBe('synced');
+  });
+
   it('reports offline without touching the server when the browser is offline', async () => {
     online = false;
     await saveExercise('a');
