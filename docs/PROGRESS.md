@@ -44,10 +44,12 @@ Last updated: 2026-11-13. Branch: `m3-active-workout`.
   - 3.1 calc: set validation, Epley e1RM, volume, PR flags (Q5/Q6/U1/U2), finish cleanup, workoutOps transforms, duration and format helpers (`677f916`).
   - 3.2 workouts repo (meta `activeWorkoutId`, pull skips the active workout) and active-workout store: 300 ms Dexie save, 5 s non-resetting enqueue, flush on hidden/pagehide/unmount (`d302858`).
   - 3.3 SetRow, NumberInput, set table (`cc26380`). 3.4/3.5 workout home, active screen, exercise cards, mini-bar, finish flow, summary (`df5617e`).
+  - Review fixes: finish/discard persist pending edits; name and notes saved per keystroke; Undo scoped to its workout; 44 px set inputs (`e60cb73`, `5f0183b`).
   - 3.6 e2e: reload/resume, offline round trip, second-device passive row; 12/12 auth e2e green locally (`fafacbd`).
 
 ## In progress
-- M3 code-review fixes: finish/discard persist pending edits; name and notes saved on every keystroke; Undo scoped to its workout; 44 px set inputs.
+- M3 merge + deploy, then owner device check (check-in milestone).
+- Non-blocking follow-ups (M4): reset updatePrompt `hydratedOnce` on sign-out; hydrate edge window during flush.
 
 ## Blocked
 - Turn off "Allow new users to sign up" in Supabase Auth (owner, dashboard).
