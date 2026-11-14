@@ -1,0 +1,33 @@
+:root {
+  color-scheme: dark;
+  --color-bg: 11 11 15;
+  --color-surface: 21 21 27;
+  --color-surface-2: 30 30 38;
+  --color-border: 42 42 52;
+  --color-text-primary: 244 244 246;
+  --color-text-secondary: 154 154 168;
+  --color-accent: 79 140 255;
+  --color-on-accent: 11 11 15;
+  --color-success: 52 199 89;
+  --color-danger: 255 69 58;
+  --color-warning: 255 176 32;
+  --color-pr-gold: 255 200 61;
+  --radius-card: 16px;
+  --radius-control: 12px;
+}
+
+:root:not(.dark) {
+  color-scheme: light;
+  --color-bg: 245 245 247;
+  --color-surface: 255 255 255;
+  --color-surface-2: 238 238 242;
+  --color-border: 228 228 234;
+  --color-text-primary: 17 17 20;
+  --color-text-secondary: 94 94 108;
+  --color-accent: 79 140 255;
+  --color-on-accent: 11 11 15;
+  --color-success: 26 140 55;
+  --color-danger: 209 36 26;
+  --color-warning: 176 110 0;
+  --color-pr-gold: 176 128 0;
+}

@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": [
+    "vite.config.ts",
+    "vitest.config.ts",
+    "vitest.rls.config.ts",
+    "tests/rls",
+    "playwright.config.ts",
+    "tailwind.config.ts",
+    "e2e",
+    "src/vite-env.d.ts"
+  ]
+}

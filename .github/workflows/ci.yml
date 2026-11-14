@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test
+      - run: npm run build
+        env:
+          VITE_SUPABASE_URL: http://127.0.0.1:54321
+          VITE_SUPABASE_ANON_KEY: placeholder
+      - name: Guard against leaked secrets
+        run: node scripts/check-dist-secrets.mjs dist
+        env:
+          VITE_SUPABASE_ANON_KEY: placeholder
+
+  integration:
+    name: integration
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 3.1.0
+      - run: supabase start
+      - name: RLS tests
+        if: hashFiles('tests/rls/**') != ''
+        run: npm run test:rls
+      - name: E2E tests
+        if: (success() || failure()) && hashFiles('e2e/**', 'tests/e2e/**') != ''
+        run: |
+          npx playwright install --with-deps chromium
+          npm run e2e:local-supabase

@@ -30,3 +30,6 @@ Thumbs.db
 desktop.ini
 *.log
 .idea/
+
+# build output extras
+*.local
