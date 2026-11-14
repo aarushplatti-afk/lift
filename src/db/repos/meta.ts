@@ -1,3 +1,4 @@
+import { liveQuery, type Observable } from 'dexie';
 import { db } from '../schema';
 
 export async function getOwner(): Promise<{ userId: string; email: string } | undefined> {
@@ -22,6 +23,10 @@ export async function requireUserId(): Promise<string> {
 export async function isInitialPullDone(): Promise<boolean> {
   const row = await db.meta.get('initialPullDone');
   return row?.key === 'initialPullDone' && row.value;
+}
+
+export function observeInitialPullDone(): Observable<boolean> {
+  return liveQuery(isInitialPullDone);
 }
 
 export async function setInitialPullDone(v: boolean): Promise<void> {

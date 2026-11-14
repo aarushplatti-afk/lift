@@ -81,3 +81,7 @@ export function observeOutboxCounts(): Observable<{ pending: number; failed: num
     failed: await db.syncQueue.where('state').equals('failed').count(),
   }));
 }
+
+export async function countOutbox(): Promise<number> {
+  return db.syncQueue.count();
+}

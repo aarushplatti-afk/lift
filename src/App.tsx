@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { HashRouter, Outlet, Route, Routes, useLocation } from 'react-router-dom';
+import { AuthGate, ConfigError } from './components/AuthGate';
 import { UpdateToast } from './components/UpdateToast';
 import { TabBar } from './components/ui/TabBar';
 import { ToastHost } from './components/ui/Toast';
@@ -7,6 +9,13 @@ import { HistoryTab } from './routes/HistoryTab';
 import { ProgressTab } from './routes/ProgressTab';
 import { SettingsPage } from './routes/SettingsPage';
 import { WorkoutTab } from './routes/WorkoutTab';
+import { isSupabaseConfigured, getSupabase } from './lib/supabase';
+import { applyTheme } from './lib/theme';
+import { useAuthStore } from './store/auth';
+import { initSettingsStore, useSettingsStore } from './store/settings';
+import { initSyncStore } from './store/sync';
+import { getSyncEngine } from './sync/engine';
+import { startSyncTriggers } from './sync/triggers';
 
 function Layout() {
   const { pathname } = useLocation();
@@ -17,13 +26,11 @@ function Layout() {
     >
       <Outlet />
       {showTabs ? <TabBar /> : null}
-      <ToastHost />
-      <UpdateToast />
     </div>
   );
 }
 
-export default function App() {
+function Shell() {
   return (
     <HashRouter>
       <Routes>
@@ -36,5 +43,35 @@ export default function App() {
         </Route>
       </Routes>
     </HashRouter>
+  );
+}
+
+function ConfiguredApp() {
+  const status = useAuthStore((s) => s.status);
+  const theme = useSettingsStore((s) => s.settings.theme);
+
+  useEffect(() => useAuthStore.getState().init(), []);
+  useEffect(() => initSettingsStore(), []);
+  useEffect(() => initSyncStore(), []);
+  useEffect(() => applyTheme(theme), [theme]);
+  useEffect(() => {
+    if (status !== 'signedIn') return undefined;
+    return startSyncTriggers(getSyncEngine(), getSupabase().auth);
+  }, [status]);
+
+  return (
+    <AuthGate>
+      <Shell />
+    </AuthGate>
+  );
+}
+
+export default function App() {
+  return (
+    <>
+      {isSupabaseConfigured() ? <ConfiguredApp /> : <ConfigError />}
+      <ToastHost />
+      <UpdateToast />
+    </>
   );
 }
