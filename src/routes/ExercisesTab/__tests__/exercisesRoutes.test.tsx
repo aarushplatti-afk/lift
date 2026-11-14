@@ -172,6 +172,29 @@ describe('ExerciseFormPage', () => {
     ).toBeInTheDocument();
   });
 
+  it('clears notes on edit and queues exactly one upsert', async () => {
+    await db.exercises.put(row('1', 'Mine', { notes: 'old note' }));
+    renderAt('/exercises/1/edit');
+    const notes = await screen.findByLabelText('Notes (optional)');
+    await userEvent.clear(notes);
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(async () => {
+      expect((await db.exercises.get('1'))?.notes).toBeUndefined();
+    });
+    expect(await db.syncQueue.count()).toBe(1);
+  });
+
+  it('saves an archived row while a live row shares its name', async () => {
+    await db.exercises.bulkPut([row('1', 'Dup', { archived: true }), row('2', 'Dup')]);
+    renderAt('/exercises/1/edit');
+    const notes = await screen.findByLabelText('Notes (optional)');
+    await userEvent.type(notes, 'hello');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(async () => {
+      expect((await db.exercises.get('1'))?.notes).toBe('hello');
+    });
+  });
+
   it('handles a missing exercise', async () => {
     renderAt('/exercises/nope/edit');
     expect(await screen.findByText('Exercise not found')).toBeInTheDocument();

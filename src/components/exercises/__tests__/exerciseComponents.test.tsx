@@ -78,6 +78,7 @@ describe('ExerciseForm', () => {
       name: 'Row',
       muscleGroup: 'back',
       equipment: 'cable',
+      notes: '',
       type: 'weight_reps',
     });
   });

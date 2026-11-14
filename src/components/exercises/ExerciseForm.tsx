@@ -17,6 +17,7 @@ import {
   MUSCLE_GROUPS,
   NAME_MAX,
   NOTES_MAX,
+  nameKey,
   normalizeName,
 } from '../../lib/exercises';
 import type { Equipment, ExerciseType, MuscleGroup } from '../../types/domain';
@@ -29,6 +30,7 @@ interface ExerciseFormProps {
   onSubmit: (input: ExerciseInput) => Promise<ExerciseWriteResult | undefined>;
   onCancel: () => void;
   excludeId?: string;
+  archived?: boolean;
   formId?: string;
   showSubmit?: boolean;
 }
@@ -66,6 +68,7 @@ export function ExerciseForm({
   onSubmit,
   onCancel,
   excludeId,
+  archived = false,
   formId,
   showSubmit = true,
 }: ExerciseFormProps) {
@@ -79,9 +82,17 @@ export function ExerciseForm({
   const [submitting, setSubmitting] = useState(false);
 
   const normalized = normalizeName(name);
+  const skipLiveCheck =
+    archived ||
+    (excludeId !== undefined &&
+      initial?.name !== undefined &&
+      nameKey(normalized) === nameKey(initial.name));
   const taken = useLiveQuery(
-    () => (normalized === '' ? Promise.resolve(false) : isNameTaken(normalized, excludeId)),
-    [normalized, excludeId],
+    () =>
+      normalized === '' || skipLiveCheck
+        ? Promise.resolve(false)
+        : isNameTaken(normalized, excludeId),
+    [normalized, excludeId, skipLiveCheck],
     false,
   );
 
@@ -131,8 +142,8 @@ export function ExerciseForm({
       muscleGroup: muscle,
       equipment,
       type,
+      notes,
     };
-    if (notes.trim() !== '') input.notes = notes;
     setSubmitting(true);
     try {
       const result = await onSubmit(input);

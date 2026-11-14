@@ -148,7 +148,6 @@ export function ExerciseList() {
           >
             <span className="h-5 w-5 rounded-full bg-surface" />
           </span>
-          <span className="sr-only">{showArchived ? 'On' : 'Off'}</span>
         </button>
       </div>
       {body}

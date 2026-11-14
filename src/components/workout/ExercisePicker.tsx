@@ -44,9 +44,7 @@ function PickerBody({ onClose, onAdd, title }: Omit<ExercisePickerProps, 'open'>
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   };
 
-  const handleCreate = async (
-    input: ExerciseInput,
-  ): Promise<ExerciseWriteResult | undefined> => {
+  const handleCreate = async (input: ExerciseInput): Promise<ExerciseWriteResult | undefined> => {
     try {
       const result = await createExercise(input);
       if (result.ok) {

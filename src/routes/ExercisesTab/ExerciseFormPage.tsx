@@ -1,4 +1,4 @@
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ExerciseForm } from '../../components/exercises/ExerciseForm';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -22,6 +22,7 @@ const LOCK_USED = 'Type can’t change after the exercise has been logged.';
 export function ExerciseFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [params] = useSearchParams();
   const editing = id !== undefined;
 
@@ -37,7 +38,9 @@ export function ExerciseFormPage() {
   );
 
   const cancel = () => {
-    navigate(-1);
+    if (location.key === 'default')
+      navigate(id === undefined ? '/exercises' : `/exercises/${id}`, { replace: true });
+    else navigate(-1);
   };
 
   const header = (save: boolean) => (
@@ -103,7 +106,7 @@ export function ExerciseFormPage() {
         exercise === null ? await createExercise(input) : await updateExercise(exercise.id, input);
       if (result.ok) {
         if (exercise === null) navigate(`/exercises/${result.exercise.id}`, { replace: true });
-        else navigate(-1);
+        else cancel();
       }
       return result;
     } catch {
@@ -125,6 +128,7 @@ export function ExerciseFormPage() {
           lockReason={seeded ? LOCK_SEEDED : LOCK_USED}
           submitLabel="Save"
           excludeId={exercise?.id}
+          archived={exercise?.archived === true}
           onSubmit={onSubmit}
           onCancel={cancel}
         />
