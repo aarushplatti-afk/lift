@@ -13,6 +13,8 @@ import {
   setCompleted,
   setExerciseNotes,
   setNotes,
+  setRestSeconds,
+  setSetType,
   updateSet,
   type OpsCtx,
 } from '../workoutOps';
@@ -289,5 +291,41 @@ describe('unmatched targets', () => {
     expect(removeSet(w, 'nope', 's1', ctx())).toBe(w);
     expect(addSet(w, 'nope', ctx())).toBe(w);
     expect(setExerciseNotes(w, 'nope', 'x', ctx())).toBe(w);
+  });
+});
+
+describe('setSetType', () => {
+  it('changes the type and bumps updatedAt', () => {
+    const out = setSetType(base(), 'e1', 's1', 'warmup', ctx());
+    expect(out.exercises[0]?.sets[0]?.type).toBe('warmup');
+    expect(out.updatedAt).toBe(9000);
+    expect(out.exercises[0]?.sets[0]?.order).toBe(0);
+    expect(out.exercises[0]?.sets[1]?.order).toBe(1);
+  });
+  it('returns the same workout when unchanged or unknown', () => {
+    const w = base();
+    expect(setSetType(w, 'e1', 's1', 'normal', ctx())).toBe(w);
+    expect(setSetType(w, 'e1', 'nope', 'drop', ctx())).toBe(w);
+    expect(setSetType(w, 'nope', 's1', 'drop', ctx())).toBe(w);
+  });
+});
+
+describe('setRestSeconds', () => {
+  it('sets a clamped override', () => {
+    expect(setRestSeconds(base(), 'e1', 100, ctx()).exercises[0]?.restSeconds).toBe(105);
+    expect(setRestSeconds(base(), 'e1', 5, ctx()).exercises[0]?.restSeconds).toBe(15);
+    expect(setRestSeconds(base(), 'e1', 9999, ctx()).exercises[0]?.restSeconds).toBe(600);
+  });
+  it('null deletes the override', () => {
+    const w = setRestSeconds(base(), 'e1', 120, ctx());
+    const out = setRestSeconds(w, 'e1', null, ctx());
+    expect(out.exercises[0] && 'restSeconds' in out.exercises[0]).toBe(false);
+  });
+  it('returns the same workout when nothing changes', () => {
+    const w = base();
+    expect(setRestSeconds(w, 'e1', null, ctx())).toBe(w);
+    expect(setRestSeconds(w, 'nope', 90, ctx())).toBe(w);
+    const w2 = setRestSeconds(w, 'e1', 90, ctx());
+    expect(setRestSeconds(w2, 'e1', 92, ctx())).toBe(w2);
   });
 });

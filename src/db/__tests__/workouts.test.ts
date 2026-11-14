@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '../schema';
-import { setOwner } from '../repos/meta';
+import { getRestTimer, setOwner, setRestTimer } from '../repos/meta';
 import {
   discardWorkout,
   enqueueActiveWorkout,
   finishWorkout,
   getActiveWorkout,
+  getLastCompletedWithExercises,
   getWorkout,
   listCompletedWorkouts,
   observeActiveWorkoutId,
@@ -312,5 +313,43 @@ describe('listCompletedWorkouts / getWorkout', () => {
     await db.workouts.put(wk('a', 1, 'completed'));
     expect((await getWorkout('a'))?.id).toBe('a');
     expect(await getWorkout('zz')).toBeUndefined();
+  });
+});
+
+describe('getLastCompletedWithExercises', () => {
+  it('finds the latest completed workout for each exercise in one pass', async () => {
+    await db.workouts.bulkPut([
+      wk('old', 100, 'completed', [block('bench', 80, 5), block('squat', 100, 5)]),
+      wk('mid', 200, 'completed', [block('bench', 85, 5)]),
+      wk('new', 300, 'completed', [block('row', 60, 8)]),
+      wk('ip', 400, 'in_progress', [block('bench', 90, 5), block('dead', 90, 5)]),
+    ]);
+    const map = await getLastCompletedWithExercises(['bench', 'squat', 'row', 'dead'], 1000);
+    expect(map.get('bench')?.id).toBe('mid');
+    expect(map.get('squat')?.id).toBe('old');
+    expect(map.get('row')?.id).toBe('new');
+    expect(map.has('dead')).toBe(false);
+  });
+  it('excludes workouts at or after beforeStartedAt', async () => {
+    await db.workouts.bulkPut([
+      wk('a', 100, 'completed', [block('bench', 80, 5)]),
+      wk('b', 200, 'completed', [block('bench', 85, 5)]),
+    ]);
+    expect((await getLastCompletedWithExercises(['bench'], 200)).get('bench')?.id).toBe('a');
+    expect((await getLastCompletedWithExercises(['bench'], 100)).size).toBe(0);
+  });
+  it('returns an empty map for no ids', async () => {
+    expect((await getLastCompletedWithExercises([], 1000)).size).toBe(0);
+  });
+});
+
+describe('rest timer meta', () => {
+  it('round-trips and deletes the snapshot', async () => {
+    expect(await getRestTimer()).toBeUndefined();
+    const snap = { workoutId: 'w1', endsAt: 5000, durationSec: 90 };
+    await setRestTimer(snap);
+    expect(await getRestTimer()).toEqual(snap);
+    await setRestTimer(null);
+    expect(await getRestTimer()).toBeUndefined();
   });
 });

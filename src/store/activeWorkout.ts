@@ -15,7 +15,7 @@ import { newId } from '../lib/ids';
 import * as ops from '../lib/workoutOps';
 import type { SetPatch } from '../lib/workoutOps';
 import { useToastStore } from '../components/ui/toastStore';
-import type { ExerciseType, Workout } from '../types/domain';
+import type { ExerciseType, SetType, Workout } from '../types/domain';
 
 const SAVE_DEBOUNCE_MS = 300;
 const ENQUEUE_DELAY_MS = 5000;
@@ -34,6 +34,8 @@ export interface ActiveWorkoutState {
   updateSet: (weId: string, setId: string, patch: SetPatch) => void;
   toggleComplete: (weId: string, setId: string, type: ExerciseType) => CompleteResult;
   removeSet: (weId: string, setId: string) => void;
+  setSetType: (weId: string, setId: string, type: SetType) => void;
+  setRestSeconds: (weId: string, sec: number | null) => void;
   rename: (name: string) => void;
   setNotes: (notes: string) => void;
   flush: () => Promise<void>;
@@ -216,6 +218,9 @@ export const useActiveWorkoutStore = create<ActiveWorkoutState>((set, get) => {
       });
     },
 
+    setSetType: (weId, setId, type) => mutate((w, c) => ops.setSetType(w, weId, setId, type, c)),
+    setRestSeconds: (weId, sec) => mutate((w, c) => ops.setRestSeconds(w, weId, sec, c)),
+
     rename: (name) => mutate((w, c) => ops.rename(w, name, c)),
     setNotes: (notes) => mutate((w, c) => ops.setNotes(w, notes, c)),
 
@@ -261,11 +266,36 @@ export function isWorkoutActive(s: ActiveWorkoutState): boolean {
   return s.workout !== null || s.status === 'loading';
 }
 
-async function hydrate(): Promise<void> {
-  const row = await getActiveWorkout();
-  if ((row?.id ?? null) === (useActiveWorkoutStore.getState().workout?.id ?? null)) return;
+let hydrateGen = 0;
+
+function sameId(row: Workout | undefined): boolean {
+  return (row?.id ?? null) === (useActiveWorkoutStore.getState().workout?.id ?? null);
+}
+
+let latestHydrate: Promise<void> = Promise.resolve();
+
+function hydrate(): Promise<void> {
+  latestHydrate = runHydrate();
+  return latestHydrate;
+}
+
+async function settleHydration(): Promise<void> {
+  let current: Promise<void>;
+  do {
+    current = latestHydrate;
+    await current.catch(() => undefined);
+  } while (current !== latestHydrate);
+}
+
+async function runHydrate(): Promise<void> {
+  hydrateGen += 1;
+  const gen = hydrateGen;
+  if (sameId(await getActiveWorkout())) return;
   await flushNow();
-  if ((row?.id ?? null) === (useActiveWorkoutStore.getState().workout?.id ?? null)) return;
+  if (gen !== hydrateGen) return;
+  const row = await getActiveWorkout();
+  if (gen !== hydrateGen || sameId(row)) return;
+  resetPersistence();
   useActiveWorkoutStore.setState({ workout: row ?? null });
 }
 
@@ -274,6 +304,7 @@ export function initActiveWorkoutStore(): () => void {
   let stopped = false;
   void hydrate()
     .catch(() => undefined)
+    .then(settleHydration)
     .then(() => {
       if (!stopped) useActiveWorkoutStore.setState({ status: 'ready' });
     });

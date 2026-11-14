@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SETTINGS } from '../../db/repos/settings';
 import { useToastStore } from '../../components/ui/toastStore';
 import { useSettingsStore } from '../../store/settings';
@@ -92,6 +92,55 @@ describe('SettingsPage', () => {
       await Promise.resolve();
     });
     expect(button).toBeEnabled();
+  });
+
+  describe('Workout section', () => {
+    afterEach(() => {
+      Reflect.deleteProperty(navigator, 'vibrate');
+      Reflect.deleteProperty(navigator, 'wakeLock');
+    });
+
+    it('steps the default rest time by 15 seconds', async () => {
+      renderPage();
+      await userEvent.click(screen.getByRole('button', { name: 'Increase Default rest time' }));
+      expect(update).toHaveBeenCalledWith({ defaultRestSeconds: 105 });
+      await userEvent.click(screen.getByRole('button', { name: 'Decrease Default rest time' }));
+      expect(update).toHaveBeenCalledWith({ defaultRestSeconds: 75 });
+    });
+
+    it('sends the right patch for auto-start and sound', async () => {
+      renderPage();
+      await userEvent.click(screen.getByRole('switch', { name: /Auto-start rest timer/ }));
+      expect(update).toHaveBeenCalledWith({ restTimerAutoStart: false });
+      await userEvent.click(screen.getByRole('switch', { name: /Sound/ }));
+      expect(update).toHaveBeenCalledWith({ soundEnabled: false });
+    });
+
+    it('hides Haptics when vibration is unsupported', () => {
+      renderPage();
+      expect(screen.queryByRole('switch', { name: /Haptics/ })).toBeNull();
+    });
+
+    it('shows Haptics when supported and sends its patch', async () => {
+      Object.defineProperty(navigator, 'vibrate', { configurable: true, value: vi.fn() });
+      renderPage();
+      await userEvent.click(screen.getByRole('switch', { name: /Haptics/ }));
+      expect(update).toHaveBeenCalledWith({ hapticsEnabled: false });
+    });
+
+    it('disables Keep screen awake with a caption when unsupported', () => {
+      renderPage();
+      const toggle = screen.getByRole('switch', { name: /Keep screen awake/ });
+      expect(toggle).toBeDisabled();
+      expect(screen.getByText('Not supported in this browser.')).toBeInTheDocument();
+    });
+
+    it('sends the Keep screen awake patch when supported', async () => {
+      Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: {} });
+      renderPage();
+      await userEvent.click(screen.getByRole('switch', { name: /Keep screen awake/ }));
+      expect(update).toHaveBeenCalledWith({ keepScreenAwakeDuringWorkout: false });
+    });
   });
 
   it('disables Sync now while offline', () => {

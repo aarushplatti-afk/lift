@@ -18,6 +18,9 @@ function renderRow(
     onChange?: (p: SetPatch) => void;
     onToggle?: () => CompleteResult;
     onBadge?: () => void;
+    previousText?: string;
+    onFillPrevious?: () => void;
+    badge?: string;
   } = {},
 ) {
   const ui = (unit: Unit) => (
@@ -30,6 +33,9 @@ function renderRow(
         onChange={opts.onChange ?? (() => undefined)}
         onToggle={opts.onToggle ?? (() => ({ ok: true, completed: true }))}
         onBadge={opts.onBadge ?? (() => undefined)}
+        badge={opts.badge ?? '1'}
+        previousText={opts.previousText ?? '—'}
+        onFillPrevious={opts.onFillPrevious}
       />
     </WorkoutSetTable>
   );
@@ -135,6 +141,26 @@ describe('SetRow completion', () => {
     renderRow('weight_reps', { onBadge });
     await userEvent.click(screen.getByRole('button', { name: 'Set 1 options' }));
     expect(onBadge).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('SetRow previous and badge', () => {
+  it('renders previous text as a fill button when fill is available', async () => {
+    const onFillPrevious = vi.fn();
+    renderRow('weight_reps', { previousText: '135 × 5', onFillPrevious });
+    await userEvent.click(screen.getByRole('button', { name: 'Use previous: 135 × 5' }));
+    expect(onFillPrevious).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders previous text as plain text when fill is unavailable', () => {
+    renderRow('weight_reps', { previousText: '135 × 5' });
+    expect(screen.getByText('135 × 5')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Use previous/ })).toBeNull();
+  });
+
+  it('shows the badge label and adds the set type to its accessible name', () => {
+    renderRow('weight_reps', { badge: 'D', set: { type: 'drop' } });
+    expect(screen.getByRole('button', { name: 'Set 1 options, drop set' })).toHaveTextContent('D');
   });
 });
 

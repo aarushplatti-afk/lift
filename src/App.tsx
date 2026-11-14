@@ -18,6 +18,7 @@ import { isSupabaseConfigured, getSupabase } from './lib/supabase';
 import { applyTheme } from './lib/theme';
 import { useAuthStore } from './store/auth';
 import { initActiveWorkoutStore, useActiveWorkoutStore } from './store/activeWorkout';
+import { initRestTimer } from './store/restTimer';
 import { initSettingsStore, useSettingsStore } from './store/settings';
 import { initSyncStore } from './store/sync';
 import { getSyncEngine } from './sync/engine';
@@ -78,6 +79,7 @@ function ConfiguredApp() {
   useEffect(() => initSyncStore(), []);
   useEffect(() => (hydrated ? applyTheme(theme) : undefined), [hydrated, theme]);
   useEffect(() => (status === 'signedIn' ? initActiveWorkoutStore() : undefined), [status]);
+  useEffect(() => (status === 'signedIn' ? initRestTimer() : undefined), [status]);
   useEffect(() => {
     if (status !== 'signedIn') return undefined;
     return startSyncTriggers(getSyncEngine(), getSupabase().auth);

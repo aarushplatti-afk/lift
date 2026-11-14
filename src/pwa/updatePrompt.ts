@@ -26,6 +26,10 @@ useActiveWorkoutStore.subscribe((s) => {
   if (s.status === 'ready') hydratedOnce = true;
 });
 
+useAuthStore.subscribe((s) => {
+  if (s.status !== 'signedIn') hydratedOnce = false;
+});
+
 function watchForUpdates(registration: ServiceWorkerRegistration): void {
   const check = () => {
     void registration.update().catch(() => undefined);

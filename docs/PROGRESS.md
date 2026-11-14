@@ -1,6 +1,6 @@
 # Lift — Progress Log
 
-Last updated: 2026-11-13. Branch: `m3-active-workout`.
+Last updated: 2026-11-14. Branch: `m4-timer-polish`.
 
 ## Done
 - Step 0: repo created, PRD moved to docs/PRD.md, Claude Code config (CLAUDE.md, agents, settings, commands).
@@ -47,9 +47,17 @@ Last updated: 2026-11-13. Branch: `m3-active-workout`.
   - Review fixes: finish/discard persist pending edits; name and notes saved per keystroke; Undo scoped to its workout; 44 px set inputs (`e60cb73`, `5f0183b`).
   - 3.6 e2e: reload/resume, offline round trip, second-device passive row; 12/12 auth e2e green locally (`fafacbd`).
 
+- M3 merged (PR #4), deployed, and confirmed on the owner's phone (2026-11-14).
+- M4 Rest timer + polish (branch `m4-timer-polish`, spec docs/milestones/M4-spec.md):
+  - 4.1 previous-set lookup (T6), badge labels (T5), formatPreviousSet, setSetType/setRestSeconds, batch previous-workout query, rest-timer meta snapshot (`119e884`).
+  - 4.3 platform helpers: wake lock, haptics, generated WebAudio chime (`a03d7b4`). 4.4a Toggle, Stepper, SwipeRow (`efaa4c3`).
+  - 4.2 timestamp-based rest timer store with reload restore and silent late completion (T2/T3); M3 follow-ups: updatePrompt `hydratedOnce` reset, hydrate generation counter (`d529d10`).
+  - 4.4b previous column with tap-fill, set-type sheet, swipe delete, RestTimerBar, per-exercise rest, wake lock on the workout screen, Workout settings section (`2d60ce6`).
+  - Review fix: the timer re-arms if its timeout fires before the wall clock reaches `endsAt` (`a8c861d`).
+
 ## In progress
-- M3 merge + deploy, then owner device check (check-in milestone).
-- Non-blocking follow-ups (M4): reset updatePrompt `hydratedOnce` on sign-out; hydrate edge window during flush.
+- M4 merge + deploy, then owner device check. E2E found that the store could report "ready" before the workout loaded (reload redirected home and dropped the rest timer); fixed by waiting for the latest hydrate. 14/14 e2e and 585 unit tests green locally.
+- Known exception to "no unused exports": `pickPreviousWorkout`, `setGroup`, `SetGroup` and `RestPhase` are spec contracts used only in tests or inside their own module.
 
 ## Blocked
 - Turn off "Allow new users to sign up" in Supabase Auth (owner, dashboard).
@@ -103,4 +111,12 @@ Last updated: 2026-11-13. Branch: `m3-active-workout`.
   - U4: default workout name depends on time of day ("Morning Workout" etc.).
   - U5: the device that owns an in-progress workout wins over a remote discard.
   - W1–W8 in M3-spec §0. The >6 h end-time prompt (P1, 3.5b) is deferred. The multi-tab active-workout warning (P1) is deferred to M10.
+- 2026-11-14, M4 decisions (accepted architect defaults; reversible):
+  - The rest timer survives a reload (Dexie meta snapshot).
+  - Badge numbers count normal sets only (1, 2, D, 3).
+  - A timer that ends while the phone is locked, or more than 5 s late, completes silently.
+  - Tap-to-fill is off for completed rows.
+  - PREVIOUS matches warm-ups with warm-ups and working sets with working sets, per block.
+  - Haptics toggle is hidden when unsupported; keep-awake is disabled when unsupported.
+  - No manual timer start; the weight-increment setting is deferred; sound is on by default.
 - Defaults per PRD §16: lb, blue accent `#4F8CFF`, name "Lift".
