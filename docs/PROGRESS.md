@@ -20,17 +20,20 @@ Last updated: 2026-11-13. Branch: `m1-foundation`.
 - M1 1.11 CI and deploy workflows (`1dc38ee`).
 - M1 1.12 authenticated acceptance specs: gate, offline, settings sync, account switch (`b40a126`).
 
+- M1 review fixes and 1.13 docs; code-reviewer blockers all resolved; CI green (141 unit, 52 RLS + 1 skipped, 8 e2e).
+- M1 merged to `main` (PR #1) and deployed to https://aarushplatti-afk.github.io/lift/.
+- Branch protection on `main`: required `ci` check, no force-push, no deletion (P7).
+- GitHub Pages source = Actions; secrets `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` set (P6).
+- 2026-11-13: remote migration `0001_init` applied with owner approval (P8, version `20261114022326`; local file renamed to match). Security advisor: only "leaked password protection disabled" (dashboard toggle). `src/types/database.ts` now generated from the remote schema.
+- `.env.local` created (P3). Owner created their account in the dashboard and set Auth URLs (P4, P5 part 1).
+- Setup screen now shows the sync error instead of silently retrying (the first sign-in hung on "Setting up…" because the tables did not exist yet; logs showed 404 on `/rest/v1/exercises`).
+
 ## In progress
-- M1 review fixes (uncommitted on `m1-foundation`: CI and deploy workflow edits, dist secret guard script, App and AuthGate fixes, settings page changes).
-- M1 1.13: README and PROGRESS update (uncommitted).
-- M1 merge: PR to `main` after code-reviewer PASS and green `ci` check.
-- M1 remote migration push of `0001_init.sql` (P8, needs explicit owner approval) and deploy check on iPhone and Android.
-- Step 0 user actions: `.env.local` with the publishable key (P3, user only; Claude is denied `.env*`), Supabase Auth settings (P4), GitHub Pages source and Actions secrets (P6), branch protection on `main` after the first CI run (P7).
-- Step 0: Docker Desktop install, see Blocked.
+- M1 device check on iPhone and Android (owner).
 
 ## Blocked
-- Local Docker engine: WSL is not installed on the dev machine, so `supabase start` and `npm run test:rls` cannot run locally. RLS and e2e are verified in the CI `integration` job instead (not a required check in M1).
-- Owner account creation (P5) and turning off public sign-up on the remote project. Needs the owner in the Supabase dashboard.
+- Local Docker engine: WSL is not installed on the dev machine, so `supabase start` and `npm run test:rls` cannot run locally. RLS and e2e are verified in the CI `integration` job instead. Needs the owner to run `wsl --install --no-distribution` in an elevated PowerShell and reboot (Claude cannot elevate).
+- Turn off "Allow new users to sign up" in Supabase Auth (owner, dashboard).
 
 ## Decisions
 - Hosting: public GitHub repo + GitHub Pages (HashRouter, Vite base `/lift/`).

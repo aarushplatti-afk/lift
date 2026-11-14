@@ -43,13 +43,19 @@ function SignedOut() {
 function SettingUp() {
   const syncNow = useSyncStore((s) => s.syncNow);
   const state = useSyncStore((s) => s.status.state);
+  const lastError = useSyncStore((s) => s.status.lastError);
   return (
     <CenteredMessage title="Setting up…">
       <p role="status" className="text-body">
-        Downloading your data.
+        {state === 'syncing' ? 'Downloading your data.' : 'Waiting to download your data.'}
       </p>
       {state === 'offline' ? (
         <p className="text-body-sm">You are offline. Connect to the internet to finish setup.</p>
+      ) : null}
+      {state === 'error' ? (
+        <p role="alert" className="text-body-sm text-danger">
+          Error: setup couldn&apos;t finish{lastError ? ` (${lastError})` : ''}. Tap Retry.
+        </p>
       ) : null}
       <Button onClick={() => void syncNow()}>Retry</Button>
     </CenteredMessage>
