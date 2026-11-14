@@ -17,6 +17,8 @@
   "include": [
     "vite.config.ts",
     "vitest.config.ts",
+    "vitest.rls.config.ts",
+    "tests/rls",
     "playwright.config.ts",
     "tailwind.config.ts",
     "e2e"

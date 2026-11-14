@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:rls": "node scripts/with-local-supabase.mjs vitest run -c vitest.rls.config.ts",
     "e2e": "playwright test",
     "format": "prettier --write .",
     "gen:types": "supabase gen types typescript --local > src/types/database.ts",
