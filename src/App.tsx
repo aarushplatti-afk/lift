@@ -4,17 +4,20 @@ import { AuthGate, ConfigError } from './components/AuthGate';
 import { UpdateToast } from './components/UpdateToast';
 import { TabBar } from './components/ui/TabBar';
 import { ToastHost } from './components/ui/Toast';
+import { WorkoutMiniBar } from './components/workout/WorkoutMiniBar';
 import { ExerciseDetail } from './routes/ExercisesTab/ExerciseDetail';
 import { ExerciseFormPage } from './routes/ExercisesTab/ExerciseFormPage';
 import { ExerciseList } from './routes/ExercisesTab/ExerciseList';
 import { HistoryTab } from './routes/HistoryTab';
 import { ProgressTab } from './routes/ProgressTab';
 import { SettingsPage } from './routes/SettingsPage';
-import { WorkoutTab } from './routes/WorkoutTab';
+import { ActiveWorkout } from './routes/WorkoutTab/ActiveWorkout';
+import { Summary } from './routes/WorkoutTab/Summary';
+import { WorkoutHome } from './routes/WorkoutTab/WorkoutHome';
 import { isSupabaseConfigured, getSupabase } from './lib/supabase';
 import { applyTheme } from './lib/theme';
 import { useAuthStore } from './store/auth';
-import { initActiveWorkoutStore } from './store/activeWorkout';
+import { initActiveWorkoutStore, useActiveWorkoutStore } from './store/activeWorkout';
 import { initSettingsStore, useSettingsStore } from './store/settings';
 import { initSyncStore } from './store/sync';
 import { getSyncEngine } from './sync/engine';
@@ -22,15 +25,23 @@ import { startSyncTriggers } from './sync/triggers';
 
 function Layout() {
   const { pathname } = useLocation();
+  const workoutActive = useActiveWorkoutStore((s) => s.workout !== null);
+  const inWorkoutFlow = pathname.startsWith('/workout/');
   const showTabs =
+    !inWorkoutFlow &&
     pathname !== '/settings' &&
     pathname !== '/exercises/new' &&
     !/^\/exercises\/[^/]+\/edit$/.test(pathname);
+  const showMiniBar = showTabs && workoutActive && pathname !== '/';
+  const padding = !showTabs
+    ? 'pb-safe'
+    : showMiniBar
+      ? 'pb-[calc(112px+env(safe-area-inset-bottom))]'
+      : 'pb-[calc(64px+env(safe-area-inset-bottom))]';
   return (
-    <div
-      className={`pl-safe pr-safe min-h-dvh ${showTabs ? 'pb-[calc(64px+env(safe-area-inset-bottom))]' : 'pb-safe'}`}
-    >
+    <div className={`pl-safe pr-safe min-h-dvh ${padding}`}>
       <Outlet />
+      {showMiniBar ? <WorkoutMiniBar /> : null}
       {showTabs ? <TabBar /> : null}
     </div>
   );
@@ -41,7 +52,9 @@ function Shell() {
     <HashRouter>
       <Routes>
         <Route element={<Layout />}>
-          <Route index element={<WorkoutTab />} />
+          <Route index element={<WorkoutHome />} />
+          <Route path="workout/active" element={<ActiveWorkout />} />
+          <Route path="workout/summary/:id" element={<Summary />} />
           <Route path="history" element={<HistoryTab />} />
           <Route path="progress" element={<ProgressTab />} />
           <Route path="exercises" element={<ExerciseList />} />

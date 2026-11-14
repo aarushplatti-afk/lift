@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import { DEFAULT_SETTINGS } from './db/repos/settings';
+import { wipeLocalData } from './db/repos/meta';
+import { db } from './db/schema';
 import { useAuthStore } from './store/auth';
 import { useSettingsStore } from './store/settings';
 import { useSyncStore } from './store/sync';
@@ -101,5 +103,26 @@ describe('App gate', () => {
     expect(screen.getByRole('heading', { name: 'Settings', level: 1 })).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Main' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
+  });
+
+  it('shows the mini-bar on other tabs while a workout is active and hides tabs on workout screens', async () => {
+    await wipeLocalData();
+    setAuth('signedIn', true);
+    await db.workouts.put({
+      id: 'w1',
+      userId: 'u1',
+      name: 'Test',
+      startedAt: Date.now(),
+      status: 'in_progress',
+      exercises: [],
+      createdAt: 1,
+      updatedAt: 1,
+    });
+    await db.meta.put({ key: 'activeWorkoutId', value: 'w1' });
+    window.location.hash = '#/history';
+    render(<App />);
+    await userEvent.click(await screen.findByRole('button', { name: /Workout in progress/ }));
+    expect(await screen.findByLabelText('Workout name')).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Main' })).not.toBeInTheDocument();
   });
 });
