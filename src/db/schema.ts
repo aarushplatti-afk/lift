@@ -6,7 +6,8 @@ export type MetaRow =
   | { key: 'ownerUserId'; value: string }
   | { key: 'ownerEmail'; value: string }
   | { key: 'initialPullDone'; value: boolean }
-  | { key: 'seedVersion'; value: number };
+  | { key: 'seedVersion'; value: number }
+  | { key: 'activeWorkoutId'; value: string };
 export type MetaKey = MetaRow['key'];
 
 export class LiftDB extends Dexie {
