@@ -44,7 +44,9 @@ function PickerBody({ onClose, onAdd, title }: Omit<ExercisePickerProps, 'open'>
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   };
 
-  const handleCreate = async (input: ExerciseInput): Promise<ExerciseWriteResult> => {
+  const handleCreate = async (
+    input: ExerciseInput,
+  ): Promise<ExerciseWriteResult | undefined> => {
     try {
       const result = await createExercise(input);
       if (result.ok) {
@@ -54,7 +56,7 @@ function PickerBody({ onClose, onAdd, title }: Omit<ExercisePickerProps, 'open'>
       return result;
     } catch {
       showToast({ message: SAVE_FAILED });
-      return { ok: false, error: { field: 'name', code: 'locked' } };
+      return undefined;
     }
   };
 
@@ -72,7 +74,6 @@ function PickerBody({ onClose, onAdd, title }: Omit<ExercisePickerProps, 'open'>
             ...(trimmed === '' ? {} : { name: trimmed }),
             ...(muscle === 'all' ? {} : { muscleGroup: muscle }),
           }}
-          lockReason={SAVE_FAILED}
           submitLabel="Create"
           onSubmit={handleCreate}
           onCancel={() => {

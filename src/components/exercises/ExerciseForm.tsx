@@ -26,7 +26,7 @@ interface ExerciseFormProps {
   locked?: { name?: boolean; type?: boolean };
   lockReason?: string;
   submitLabel: string;
-  onSubmit: (input: ExerciseInput) => Promise<ExerciseWriteResult>;
+  onSubmit: (input: ExerciseInput) => Promise<ExerciseWriteResult | undefined>;
   onCancel: () => void;
   excludeId?: string;
   formId?: string;
@@ -136,7 +136,7 @@ export function ExerciseForm({
     setSubmitting(true);
     try {
       const result = await onSubmit(input);
-      if (!result.ok) {
+      if (result?.ok === false) {
         const { error } = result;
         setServerErrors({ [error.field]: messageFor(error) });
       }
