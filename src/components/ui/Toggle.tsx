@@ -1,3 +1,5 @@
+import { useId } from 'react';
+
 interface ToggleProps {
   label: string;
   checked: boolean;
@@ -7,11 +9,15 @@ interface ToggleProps {
 }
 
 export function Toggle({ label, checked, onChange, description, disabled = false }: ToggleProps) {
+  const labelId = useId();
+  const descId = useId();
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      aria-labelledby={labelId}
+      aria-describedby={description ? descId : undefined}
       disabled={disabled}
       onClick={() => {
         onChange(!checked);
@@ -19,8 +25,14 @@ export function Toggle({ label, checked, onChange, description, disabled = false
       className="flex min-h-tap w-full items-center justify-between gap-3 rounded-control py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50"
     >
       <span className="flex min-w-0 flex-col">
-        <span className="text-body text-primary">{label}</span>
-        {description ? <span className="text-body-sm text-secondary">{description}</span> : null}
+        <span id={labelId} className="text-body text-primary">
+          {label}
+        </span>
+        {description ? (
+          <span id={descId} className="text-body-sm text-secondary">
+            {description}
+          </span>
+        ) : null}
       </span>
       <span
         aria-hidden="true"

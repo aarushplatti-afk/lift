@@ -14,6 +14,14 @@ const REVEAL_WIDTH = 80;
 
 let closeOpenRow: (() => void) | null = null;
 
+function isFormField(target: EventTarget): boolean {
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement
+  );
+}
+
 type Gesture = 'pending' | 'horizontal' | 'vertical';
 
 interface Drag {
@@ -61,6 +69,7 @@ export function SwipeRow({ children, onDelete, deleteLabel, disabled = false }: 
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (disabled) return;
+    if (e.pointerType === 'mouse' && isFormField(e.target)) return;
     dragRef.current = {
       pointerId: e.pointerId,
       startX: e.clientX,
@@ -120,6 +129,7 @@ export function SwipeRow({ children, onDelete, deleteLabel, disabled = false }: 
       <button
         ref={deleteRef}
         type="button"
+        aria-label={deleteLabel}
         tabIndex={open ? 0 : -1}
         aria-hidden={open ? undefined : true}
         onClick={() => {
@@ -128,7 +138,7 @@ export function SwipeRow({ children, onDelete, deleteLabel, disabled = false }: 
         }}
         className="absolute inset-y-0 right-0 flex min-h-tap w-20 items-center justify-center bg-danger text-body font-semibold text-on-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
       >
-        {deleteLabel}
+        Delete
       </button>
       <div
         onPointerDown={onPointerDown}

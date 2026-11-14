@@ -272,6 +272,24 @@ describe('rest timer', () => {
     expect(await screen.findByTestId('rest-timer-bar')).toHaveTextContent('Rest complete');
   });
 
+  it('announces when a rest starts, including a restart from done', async () => {
+    await seed({ current: [set('s1', 0, { weightKg: 50, reps: 5 })] });
+    const live = (): string =>
+      document.querySelector('[aria-live="polite"][aria-atomic="true"]')?.textContent ?? '';
+    act(() => {
+      useRestTimerStore.getState().start(15, 'cur');
+    });
+    expect(live()).toBe('Rest started, 0:15');
+    act(() => {
+      useRestTimerStore.getState().tick(Date.now() + 16_000);
+    });
+    expect(live()).toBe('Rest complete');
+    act(() => {
+      useRestTimerStore.getState().start(30, 'cur');
+    });
+    expect(live()).toBe('Rest started, 0:30');
+  });
+
   it('sets a per-exercise override from the menu and shows it in the menu label', async () => {
     const user = userEvent.setup();
     await seed({ current: [set('s1', 0)] });

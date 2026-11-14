@@ -38,7 +38,7 @@ describe('SwipeRow', () => {
 
   it('reveals the Delete button at 80 px and it deletes', async () => {
     const { onDelete, content } = setup();
-    const btn = screen.getByText('Delete');
+    const btn = screen.getByText('Delete', { selector: 'button' });
     expect(btn).toHaveAttribute('aria-hidden', 'true');
     expect(btn).toHaveAttribute('tabindex', '-1');
     swipe(content, -100);
@@ -54,7 +54,10 @@ describe('SwipeRow', () => {
     swipe(content, -40);
     expect(onDelete).not.toHaveBeenCalled();
     expect(content.style.transform).toBe('translateX(0px)');
-    expect(screen.getByText('Delete')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByText('Delete', { selector: 'button' })).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    );
   });
 
   it('never locks horizontal on a vertical drag', () => {
@@ -65,6 +68,47 @@ describe('SwipeRow', () => {
     fireEvent.pointerUp(content, { pointerId: 1, clientX: 100, clientY: 150 });
     expect(onDelete).not.toHaveBeenCalled();
     expect(content.style.transform).toBe('translateX(0px)');
+  });
+
+  it('ignores mouse drags that start inside an input but not touch swipes', () => {
+    const onDelete = vi.fn();
+    render(
+      <SwipeRow onDelete={onDelete} deleteLabel="Delete set 1">
+        <input data-testid="field" aria-label="Weight" />
+      </SwipeRow>,
+    );
+    const field = screen.getByTestId('field');
+    const content = field.parentElement as HTMLElement;
+    mockWidth(content);
+    fireEvent.pointerDown(field, {
+      pointerId: 1,
+      pointerType: 'mouse',
+      clientX: 300,
+      clientY: 100,
+    });
+    fireEvent.pointerMove(field, { pointerId: 1, pointerType: 'mouse', clientX: 50, clientY: 100 });
+    fireEvent.pointerUp(field, { pointerId: 1, pointerType: 'mouse', clientX: 50, clientY: 100 });
+    expect(onDelete).not.toHaveBeenCalled();
+    expect(content.style.transform).toBe('translateX(0px)');
+    fireEvent.pointerDown(field, {
+      pointerId: 2,
+      pointerType: 'touch',
+      clientX: 300,
+      clientY: 100,
+    });
+    fireEvent.pointerMove(field, { pointerId: 2, pointerType: 'touch', clientX: 50, clientY: 100 });
+    fireEvent.pointerUp(field, { pointerId: 2, pointerType: 'touch', clientX: 50, clientY: 100 });
+    expect(onDelete).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows short visible text with the full aria-label', () => {
+    render(
+      <SwipeRow onDelete={vi.fn()} deleteLabel="Delete set 3">
+        <div>Row</div>
+      </SwipeRow>,
+    );
+    const btn = screen.getByText('Delete', { selector: 'button' });
+    expect(btn).toHaveAttribute('aria-label', 'Delete set 3');
   });
 
   it('ignores swipes when disabled', () => {
@@ -109,9 +153,9 @@ describe('Toggle', () => {
   it('exposes switch semantics and toggles', async () => {
     const onChange = vi.fn();
     render(<Toggle label="Sound" description="Beep at zero" checked={false} onChange={onChange} />);
-    const sw = screen.getByRole('switch', { name: /Sound/ });
+    const sw = screen.getByRole('switch', { name: 'Sound' });
     expect(sw).toHaveAttribute('aria-checked', 'false');
-    expect(screen.getByText('Beep at zero')).toBeInTheDocument();
+    expect(sw).toHaveAccessibleDescription('Beep at zero');
     await userEvent.click(sw);
     expect(onChange).toHaveBeenCalledWith(true);
   });
