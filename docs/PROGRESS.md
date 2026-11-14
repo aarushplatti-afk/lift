@@ -56,7 +56,7 @@ Last updated: 2026-11-14. Branch: `m4-timer-polish`.
   - Review fix: the timer re-arms if its timeout fires before the wall clock reaches `endsAt` (`a8c861d`).
 
 ## In progress
-- M4 review polish (RestTimerBar announcements and idle rendering, SwipeRow label and mouse-on-input drag, Toggle description), e2e, merge and deploy.
+- M4 merge + deploy, then owner device check. E2E found that the store could report "ready" before the workout loaded (reload redirected home and dropped the rest timer); fixed by waiting for the latest hydrate. 14/14 e2e and 585 unit tests green locally.
 - Known exception to "no unused exports": `pickPreviousWorkout`, `setGroup`, `SetGroup` and `RestPhase` are spec contracts used only in tests or inside their own module.
 
 ## Blocked
