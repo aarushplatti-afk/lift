@@ -226,3 +226,40 @@ describe('NumberInput', () => {
     expect(onCommit).toHaveBeenLastCalledWith(12);
   });
 });
+
+describe('SetRow template mode', () => {
+  function renderTemplate(type: ExerciseType, unit: Unit = 'lb') {
+    return render(
+      <WorkoutSetTable type={type} unit={unit} mode="template">
+        <SetRow
+          mode="template"
+          set={{ ...baseSet, weightKg: 200, reps: 5, completed: true }}
+          index={0}
+          type={type}
+          unit={unit}
+          onChange={() => undefined}
+          onBadge={() => undefined}
+          badge="1"
+        />
+      </WorkoutSetTable>,
+    );
+  }
+
+  it('has target labels and no check, previous or completed styling', () => {
+    renderTemplate('weight_reps');
+    expect(screen.getByLabelText('Target weight (lb) set 1')).toBeInTheDocument();
+    expect(screen.getByLabelText('Target reps set 1')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Complete set 1')).toBeNull();
+    expect(screen.queryByText('Previous')).toBeNull();
+    expect(screen.queryByText('✓')).toBeNull();
+    expect(screen.getByRole('group', { name: 'Set 1' }).className).not.toContain('bg-accent-tint');
+  });
+
+  it('labels added weight and time targets', () => {
+    const { unmount } = renderTemplate('weighted_bodyweight');
+    expect(screen.getByLabelText('Target added weight (lb) set 1')).toBeInTheDocument();
+    unmount();
+    renderTemplate('duration');
+    expect(screen.getByLabelText('Target time set 1')).toBeInTheDocument();
+  });
+});
