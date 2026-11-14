@@ -1,6 +1,6 @@
 # Lift — Progress Log
 
-Last updated: 2026-11-13. Branch: `m2-exercises`.
+Last updated: 2026-11-13. Branch: `m3-active-workout`.
 
 ## Done
 - Step 0: repo created, PRD moved to docs/PRD.md, Claude Code config (CLAUDE.md, agents, settings, commands).
@@ -38,11 +38,18 @@ Last updated: 2026-11-13. Branch: `m2-exercises`.
   - 2.6 ExercisePicker sheet (`c43b12d`). 2.7 e2e: seed count, create/delete sync, second device (CI).
   - Review fixes: clearing notes saves; archived rows editable despite a live same-name row; a seed failure no longer blocks setup.
 
+- M2 merged (PR #3) and deployed. The owner moved on to M3 ("good to go").
+- 2026-11-13: WSL2 + Docker working locally. `npx supabase start` applies `0001_init`. `npm run test:rls` (52 passed + 1 skipped) and `npm run e2e:local-supabase` now run on the dev machine.
+- M3 Active workout core (branch `m3-active-workout`, spec docs/milestones/M3-spec.md):
+  - 3.1 calc: set validation, Epley e1RM, volume, PR flags (Q5/Q6/U1/U2), finish cleanup, workoutOps transforms, duration and format helpers (`677f916`).
+  - 3.2 workouts repo (meta `activeWorkoutId`, pull skips the active workout) and active-workout store: 300 ms Dexie save, 5 s non-resetting enqueue, flush on hidden/pagehide/unmount (`d302858`).
+  - 3.3 SetRow, NumberInput, set table (`cc26380`). 3.4/3.5 workout home, active screen, exercise cards, mini-bar, finish flow, summary (`df5617e`).
+  - 3.6 e2e: reload/resume, offline round trip, second-device passive row; 12/12 auth e2e green locally (`fafacbd`).
+
 ## In progress
-- M2 merge + deploy, then owner device check.
+- M3 code-review fixes: finish/discard persist pending edits; name and notes saved on every keystroke; Undo scoped to its workout; 44 px set inputs.
 
 ## Blocked
-- Local Docker engine: WSL is not installed on the dev machine, so `supabase start` and `npm run test:rls` cannot run locally. RLS and e2e are verified in the CI `integration` job instead. Needs the owner to run `wsl --install --no-distribution` in an elevated PowerShell and reboot (Claude cannot elevate).
 - Turn off "Allow new users to sign up" in Supabase Auth (owner, dashboard).
 
 ## Decisions
@@ -87,4 +94,11 @@ Last updated: 2026-11-13. Branch: `m2-exercises`.
   - A custom exercise's type locks once it has been logged.
   - The seed library is 98 exercises (PRD §10's 69 plus 29 common additions).
   - E1–E7 in M2-spec §0 (no schema change; name normalization; collator sort; seeding skips names the user already has).
+- 2026-11-13, M3 decisions (accepted architect defaults under the owner's blanket authorization; reversible):
+  - U1: bodyweight-reps exercises earn a max-reps PR, and duration exercises a longest-set PR.
+  - U2: the first-ever logging of an exercise gets no trophy.
+  - U3: finishing with nothing incomplete saves without a confirmation.
+  - U4: default workout name depends on time of day ("Morning Workout" etc.).
+  - U5: the device that owns an in-progress workout wins over a remote discard.
+  - W1–W8 in M3-spec §0. The >6 h end-time prompt (P1, 3.5b) is deferred. The multi-tab active-workout warning (P1) is deferred to M10.
 - Defaults per PRD §16: lb, blue accent `#4F8CFF`, name "Lift".

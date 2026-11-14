@@ -93,7 +93,7 @@ export const EXCLUDED_SET_TYPES: readonly SetType[] = ['warmup'];
 export function setVolume(set: WorkoutSet, type: ExerciseType): number; // kg
 export function exerciseVolume(we: WorkoutExercise, type: ExerciseType): number;
 export function workoutVolume(w: Workout, types: ExerciseTypes): number; // unknown id → 'weight_reps'
-export function completedSetCount(w: Workout): number; // completed && canCompleteSet ok, all set types
+export function completedSetCount(w: Workout, types?: ExerciseTypes): number; // completed && canCompleteSet ok, all set types; pass types so non-weight sets validate correctly
 ```
 
 `setVolume` returns `weightKg * reps` when all of these hold, and 0 otherwise:
