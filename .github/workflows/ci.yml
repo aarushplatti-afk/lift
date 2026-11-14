@@ -46,4 +46,4 @@ jobs:
         if: hashFiles('e2e/**', 'tests/e2e/**') != ''
         run: |
           npx playwright install --with-deps chromium
-          npm run e2e
+          npm run e2e:local-supabase

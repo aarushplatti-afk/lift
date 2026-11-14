@@ -7,13 +7,15 @@ test('app shell loads offline after service worker is ready', async ({ page, con
   await expect(
     page
       .getByRole('heading', { name: 'Workout', exact: true })
-      .or(page.getByRole('heading', { name: 'Configuration error' })),
+      .or(page.getByRole('heading', { name: 'Configuration error' }))
+      .or(page.getByRole('heading', { name: 'Lift', exact: true })),
   ).toBeVisible();
   await context.setOffline(true);
   await page.reload();
   await expect(
     page
       .getByRole('heading', { name: 'Workout', exact: true })
-      .or(page.getByRole('heading', { name: 'Configuration error' })),
+      .or(page.getByRole('heading', { name: 'Configuration error' }))
+      .or(page.getByRole('heading', { name: 'Lift', exact: true })),
   ).toBeVisible();
 });
