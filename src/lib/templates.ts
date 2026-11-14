@@ -103,9 +103,17 @@ export function workoutExercisesFromTemplate(
   list: readonly TemplateExercise[],
   ctx: OpsCtx,
 ): WorkoutExercise[] {
+  return mapTemplateExercises(list, ctx, true);
+}
+
+function mapTemplateExercises(
+  list: readonly TemplateExercise[],
+  ctx: OpsCtx,
+  fillEmpty: boolean,
+): WorkoutExercise[] {
   return byOrder(list).map((te) => {
     const sets: WorkoutSet[] =
-      te.sets.length === 0
+      te.sets.length === 0 && fillEmpty
         ? [{ id: ctx.newId(), order: 0, type: 'normal', completed: false }]
         : te.sets.map((ts, j) => {
             const s: WorkoutSet = { id: ctx.newId(), order: j, type: ts.type, completed: false };
@@ -137,7 +145,7 @@ export function draftFromTemplate(t: Template, ctx: OpsCtx): TemplateDraft {
   return {
     id: t.id,
     name: t.name,
-    exercises: workoutExercisesFromTemplate(t.exercises, ctx),
+    exercises: mapTemplateExercises(t.exercises, ctx, false),
     updatedAt: ctx.now,
   };
 }

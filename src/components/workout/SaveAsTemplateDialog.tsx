@@ -65,6 +65,7 @@ function SaveForm({ workout, onClose, onSaved }: FormProps) {
         error={error}
         autoFocus
         autoComplete="off"
+        maxLength={NAME_MAX}
         onChange={(e) => {
           setName(e.target.value);
           setError(undefined);

@@ -182,9 +182,8 @@ export function TemplateEditor() {
         </Button>
         {isEdit && (
           <Button
-            variant="secondary"
+            variant="danger"
             fullWidth
-            className="text-danger"
             onClick={() => {
               setDeleteOpen(true);
             }}

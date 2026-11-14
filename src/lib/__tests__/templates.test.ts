@@ -193,6 +193,14 @@ describe('draft round trip', () => {
     expect('restSeconds' in (back.exercises[1] ?? {})).toBe(false);
   });
 
+  it('keeps a 0-set exercise empty in the draft (blank set only when starting a workout)', () => {
+    const withEmpty: TemplateExercise[] = [...exercises, te('c', 2, { sets: [] })];
+    const draft = draftFromTemplate(tpl({ exercises: withEmpty }), ctx());
+    expect(draft.exercises[2]?.sets).toEqual([]);
+    expect(templateExercisesFromDraft(draft.exercises)).toEqual(withEmpty);
+    expect(workoutExercisesFromTemplate(withEmpty, ctx())[2]?.sets).toHaveLength(1);
+  });
+
   it('keeps rest as typed in the draft and clamps only through normalize', () => {
     const drafted = templateExercisesFromDraft(
       workoutExercisesFromTemplate([te('a', 0, { restSeconds: 7 })], ctx()),

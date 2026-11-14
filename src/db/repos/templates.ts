@@ -49,7 +49,7 @@ export async function saveTemplate(
     if (existing) {
       if (
         existing.name === name &&
-        JSON.stringify(existing.exercises) === JSON.stringify(exercises)
+        JSON.stringify(normalizeTemplateExercises(existing.exercises)) === JSON.stringify(exercises)
       ) {
         return { ok: true, template: existing };
       }
