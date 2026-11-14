@@ -78,7 +78,7 @@ export const useRestTimerStore = create<RestTimerState>((set, get) => ({
       get().skip();
       return;
     }
-    const nextDuration = durationSec + (cappedEnd - endsAt) / 1000;
+    const nextDuration = Math.round(durationSec + (cappedEnd - endsAt) / 1000);
     set({ endsAt: cappedEnd, durationSec: nextDuration });
     arm(cappedEnd, nextDuration);
     persist({ workoutId, endsAt: cappedEnd, durationSec: nextDuration });
@@ -92,7 +92,11 @@ export const useRestTimerStore = create<RestTimerState>((set, get) => ({
 
   tick(now = Date.now()) {
     const { phase, endsAt } = get();
-    if (phase !== 'running' || endsAt === null || now < endsAt) return;
+    if (phase !== 'running' || endsAt === null) return;
+    if (now < endsAt) {
+      arm(endsAt, get().durationSec);
+      return;
+    }
     clearTimers();
     set({ phase: 'done' });
     persist(null);

@@ -250,6 +250,17 @@ describe('rest timer store', () => {
     expect(timer().phase).toBe('running');
     expect(mocks.playChime).not.toHaveBeenCalled();
   });
+
+  it('re-arms when the timeout fires before the wall clock reaches endsAt', () => {
+    timer().start(30, 'w1');
+    vi.setSystemTime(T0 - 5_000);
+    vi.advanceTimersByTime(30_000);
+    expect(timer().phase).toBe('running');
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+    vi.advanceTimersByTime(5_000);
+    expect(timer().phase).toBe('done');
+    expect(mocks.playChime).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('initRestTimer', () => {
