@@ -8,12 +8,11 @@ import {
   saveActiveWorkout,
   startWorkout,
   type FinishOutcome,
-  type WorkoutInit,
 } from '../db/repos/workouts';
 import { canCompleteSet, type CompleteResult } from '../lib/calc/validation';
 import { newId } from '../lib/ids';
 import * as ops from '../lib/workoutOps';
-import type { SetPatch } from '../lib/workoutOps';
+import type { SetPatch, WorkoutInit } from '../lib/workoutOps';
 import { useToastStore } from '../components/ui/toastStore';
 import type { ExerciseType, SetType, Workout } from '../types/domain';
 

@@ -12,6 +12,7 @@ import { elapsedMs } from '../../lib/calc/duration';
 import { formatElapsed } from '../../lib/format';
 import { useActiveWorkoutStore } from '../../store/activeWorkout';
 import type { Workout } from '../../types/domain';
+import { TemplateList } from './Templates/TemplateList';
 
 function ActiveWorkoutBanner({ startedAt }: { startedAt: number }) {
   const navigate = useNavigate();
@@ -151,6 +152,7 @@ export function WorkoutHome() {
             }}
           />
         ))}
+        <TemplateList />
       </main>
       <Dialog
         open={pendingDiscard !== null}

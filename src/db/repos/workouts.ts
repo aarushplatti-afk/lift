@@ -2,18 +2,13 @@ import { liveQuery, type Observable } from 'dexie';
 import { db } from '../schema';
 import { enqueue } from './outbox';
 import { requireUserId } from './meta';
+import { markTemplateUsed } from './templates';
 import { newId } from '../../lib/ids';
-import { defaultWorkoutName } from '../../lib/workoutOps';
+import { defaultWorkoutName, type WorkoutInit } from '../../lib/workoutOps';
 import { prepareFinish } from '../../lib/calc/finish';
 import { computePRFlags } from '../../lib/calc/prs';
 import type { ExerciseTypes } from '../../lib/calc/volume';
-import type { Workout, WorkoutExercise } from '../../types/domain';
-
-export interface WorkoutInit {
-  name?: string;
-  templateId?: string;
-  exercises?: WorkoutExercise[];
-}
+import type { Workout } from '../../types/domain';
 
 export type FinishOutcome = { status: 'finished'; workout: Workout } | { status: 'empty' };
 
@@ -42,7 +37,7 @@ export async function getActiveWorkout(): Promise<Workout | undefined> {
 
 export async function startWorkout(init: WorkoutInit = {}): Promise<Workout> {
   const userId = await requireUserId();
-  return db.transaction('rw', [db.workouts, db.meta], async () => {
+  return db.transaction('rw', [db.workouts, db.meta, db.templates, db.syncQueue], async () => {
     const existing = await readActive();
     if (existing) return existing;
     const now = Date.now();
@@ -59,6 +54,7 @@ export async function startWorkout(init: WorkoutInit = {}): Promise<Workout> {
     if (init.templateId !== undefined) workout.templateId = init.templateId;
     await db.workouts.put(workout);
     await db.meta.put({ key: 'activeWorkoutId', value: workout.id });
+    if (init.templateId !== undefined) await markTemplateUsed(init.templateId, now);
     return workout;
   });
 }

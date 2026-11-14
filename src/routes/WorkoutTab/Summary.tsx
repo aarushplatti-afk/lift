@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { SaveAsTemplateDialog } from '../../components/workout/SaveAsTemplateDialog';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Header } from '../../components/ui/Header';
@@ -77,6 +79,8 @@ export function Summary() {
   const unit = useSettingsStore((s) => s.settings.unit);
   const exerciseMap = useExerciseMap();
   const workout = useLiveQuery(() => getWorkout(id), [id], null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [savedAsTemplate, setSavedAsTemplate] = useState(false);
 
   const done = () => {
     navigate('/', { replace: true });
@@ -134,7 +138,29 @@ export function Summary() {
         <Button size="lg" fullWidth onClick={done}>
           Done
         </Button>
+        <Button
+          size="lg"
+          variant="secondary"
+          fullWidth
+          disabled={savedAsTemplate}
+          onClick={() => {
+            setDialogOpen(true);
+          }}
+        >
+          {savedAsTemplate ? 'Saved as template' : 'Save as Template'}
+        </Button>
       </main>
+      <SaveAsTemplateDialog
+        open={dialogOpen}
+        workout={workout}
+        onClose={() => {
+          setDialogOpen(false);
+        }}
+        onSaved={() => {
+          setSavedAsTemplate(true);
+          setDialogOpen(false);
+        }}
+      />
     </>
   );
 }

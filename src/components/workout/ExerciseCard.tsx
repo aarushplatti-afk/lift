@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { BottomSheet } from '../ui/BottomSheet';
 import { Button } from '../ui/Button';
 import { IconButton } from '../ui/IconButton';
@@ -16,6 +17,7 @@ import { HAPTIC_TAP, vibrate } from '../../lib/platform/haptics';
 import type { SetPatch } from '../../lib/workoutOps';
 import { useActiveWorkoutStore } from '../../store/activeWorkout';
 import { useRestTimerStore } from '../../store/restTimer';
+import { useTemplateDraftStore } from '../../store/templateDraft';
 import { useSettingsStore } from '../../store/settings';
 import type {
   Exercise,
@@ -36,6 +38,7 @@ interface ExerciseCardProps {
   exercise: Exercise | undefined;
   unit: Unit;
   previous: Workout | undefined;
+  mode?: 'workout' | 'template';
 }
 
 const DELETED_NAME = 'Deleted exercise';
@@ -57,16 +60,56 @@ function fillPatch(prev: WorkoutSet, type: ExerciseType): SetPatch {
   return patch;
 }
 
-export function ExerciseCard({ we, index, count, exercise, unit, previous }: ExerciseCardProps) {
-  const addSet = useActiveWorkoutStore((s) => s.addSet);
-  const updateSet = useActiveWorkoutStore((s) => s.updateSet);
+interface CardActions {
+  addSet: (weId: string) => void;
+  updateSet: (weId: string, setId: string, patch: SetPatch) => void;
+  removeSet: (weId: string, setId: string) => void;
+  removeExercise: (weId: string, name?: string) => void;
+  moveExercise: (weId: string, dir: -1 | 1) => void;
+  setSetType: (weId: string, setId: string, type: SetType) => void;
+  setRestSeconds: (weId: string, sec: number | null) => void;
+}
+
+function useCardActions(mode: 'workout' | 'template'): CardActions {
+  const w = useActiveWorkoutStore(
+    useShallow((s) => ({
+      addSet: s.addSet,
+      updateSet: s.updateSet,
+      removeSet: s.removeSet,
+      removeExercise: s.removeExercise,
+      moveExercise: s.moveExercise,
+      setSetType: s.setSetType,
+      setRestSeconds: s.setRestSeconds,
+    })),
+  );
+  const t = useTemplateDraftStore(
+    useShallow((s) => ({
+      addSet: s.addSet,
+      updateSet: s.updateSet,
+      removeSet: s.removeSet,
+      removeExercise: s.removeExercise,
+      moveExercise: s.moveExercise,
+      setSetType: s.setSetType,
+      setRestSeconds: s.setRestSeconds,
+    })),
+  );
+  return mode === 'template' ? t : w;
+}
+
+export function ExerciseCard({
+  we,
+  index,
+  count,
+  exercise,
+  unit,
+  previous,
+  mode = 'workout',
+}: ExerciseCardProps) {
+  const template = mode === 'template';
+  const { addSet, updateSet, removeSet, removeExercise, moveExercise, setSetType, setRestSeconds } =
+    useCardActions(mode);
   const toggleComplete = useActiveWorkoutStore((s) => s.toggleComplete);
-  const removeSet = useActiveWorkoutStore((s) => s.removeSet);
-  const removeExercise = useActiveWorkoutStore((s) => s.removeExercise);
-  const moveExercise = useActiveWorkoutStore((s) => s.moveExercise);
   const setExerciseNotes = useActiveWorkoutStore((s) => s.setExerciseNotes);
-  const setSetType = useActiveWorkoutStore((s) => s.setSetType);
-  const setRestSeconds = useActiveWorkoutStore((s) => s.setRestSeconds);
   const workoutId = useActiveWorkoutStore((s) => s.workout?.id);
   const settings = useSettingsStore((s) => s.settings);
   const startRest = useRestTimerStore((s) => s.start);
@@ -81,7 +124,7 @@ export function ExerciseCard({ we, index, count, exercise, unit, previous }: Exe
   const name = exercise?.name ?? DELETED_NAME;
   const type = exercise?.type ?? 'weight_reps';
   const notes = we.notes ?? '';
-  const showNote = noteOpen || notes !== '';
+  const showNote = !template && (noteOpen || notes !== '');
   const badgeIndex = we.sets.findIndex((s) => s.id === badgeSetId);
   const ordinals = groupOrdinals(we.sets);
   const badges = setBadgeLabels(we.sets);
@@ -140,9 +183,11 @@ export function ExerciseCard({ we, index, count, exercise, unit, previous }: Exe
         </div>
       )}
 
-      <WorkoutSetTable type={type} unit={unit}>
+      <WorkoutSetTable type={type} unit={unit} mode={mode}>
         {we.sets.map((s, i) => {
-          const prev = previousSetFor(we.exerciseId, ordinals[i] ?? 0, s.type, previous);
+          const prev = template
+            ? undefined
+            : previousSetFor(we.exerciseId, ordinals[i] ?? 0, s.type, previous);
           const canFill = prev !== undefined && !s.completed;
           return (
             <SwipeRow
@@ -152,28 +197,45 @@ export function ExerciseCard({ we, index, count, exercise, unit, previous }: Exe
                 removeSet(we.id, s.id);
               }}
             >
-              <SetRow
-                set={s}
-                index={i}
-                type={type}
-                unit={unit}
-                badge={badges[i] ?? String(i + 1)}
-                previousText={formatPreviousSet(prev, type, unit)}
-                onFillPrevious={
-                  canFill
-                    ? () => {
-                        updateSet(we.id, s.id, fillPatch(prev, type));
-                      }
-                    : undefined
-                }
-                onChange={(patch) => {
-                  updateSet(we.id, s.id, patch);
-                }}
-                onToggle={() => handleToggle(s.id)}
-                onBadge={() => {
-                  setBadgeSetId(s.id);
-                }}
-              />
+              {template ? (
+                <SetRow
+                  mode="template"
+                  set={s}
+                  index={i}
+                  type={type}
+                  unit={unit}
+                  badge={badges[i] ?? String(i + 1)}
+                  onChange={(patch) => {
+                    updateSet(we.id, s.id, patch);
+                  }}
+                  onBadge={() => {
+                    setBadgeSetId(s.id);
+                  }}
+                />
+              ) : (
+                <SetRow
+                  set={s}
+                  index={i}
+                  type={type}
+                  unit={unit}
+                  badge={badges[i] ?? String(i + 1)}
+                  previousText={formatPreviousSet(prev, type, unit)}
+                  onFillPrevious={
+                    canFill
+                      ? () => {
+                          updateSet(we.id, s.id, fillPatch(prev, type));
+                        }
+                      : undefined
+                  }
+                  onChange={(patch) => {
+                    updateSet(we.id, s.id, patch);
+                  }}
+                  onToggle={() => handleToggle(s.id)}
+                  onBadge={() => {
+                    setBadgeSetId(s.id);
+                  }}
+                />
+              )}
             </SwipeRow>
           );
         })}
@@ -198,15 +260,17 @@ export function ExerciseCard({ we, index, count, exercise, unit, previous }: Exe
         }}
       >
         <div className="flex flex-col gap-2">
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setNoteOpen(true);
-              setMenuOpen(false);
-            }}
-          >
-            {notes === '' ? 'Add note' : 'Edit note'}
-          </Button>
+          {!template && (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setNoteOpen(true);
+                setMenuOpen(false);
+              }}
+            >
+              {notes === '' ? 'Add note' : 'Edit note'}
+            </Button>
+          )}
           <Button
             variant="secondary"
             disabled={index === 0}

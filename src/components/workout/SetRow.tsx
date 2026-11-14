@@ -14,18 +14,28 @@ import type { SetPatch } from '../../lib/workoutOps';
 import type { ExerciseType, SetType, Unit, WorkoutSet } from '../../types/domain';
 import { SET_COL, SET_ROW_LAYOUT } from './setColumns';
 
-interface SetRowProps {
+interface SetRowBaseProps {
   set: WorkoutSet;
   index: number;
   type: ExerciseType;
   unit: Unit;
   onChange: (patch: SetPatch) => void;
-  onToggle: () => CompleteResult;
   onBadge: () => void;
   badge: string;
+}
+
+interface WorkoutModeProps extends SetRowBaseProps {
+  mode?: 'workout';
+  onToggle: () => CompleteResult;
   previousText: string;
   onFillPrevious?: () => void;
 }
+
+interface TemplateModeProps extends SetRowBaseProps {
+  mode: 'template';
+}
+
+type SetRowProps = WorkoutModeProps | TemplateModeProps;
 
 const TYPE_SUFFIX: Record<SetType, string> = {
   normal: '',
@@ -65,18 +75,9 @@ function CheckIcon() {
   );
 }
 
-export function SetRow({
-  set,
-  index,
-  type,
-  unit,
-  onChange,
-  onToggle,
-  onBadge,
-  badge,
-  previousText,
-  onFillPrevious,
-}: SetRowProps) {
+export function SetRow(props: SetRowProps) {
+  const { set, index, type, unit, onChange, onBadge, badge } = props;
+  const template = props.mode === 'template';
   const n = index + 1;
   const weightRef = useRef<HTMLInputElement>(null);
   const repsRef = useRef<HTMLInputElement>(null);
@@ -97,7 +98,16 @@ export function SetRow({
 
   const usesWeight = type === 'weight_reps' || type === 'weighted_bodyweight';
   const usesReps = type !== 'duration';
-  const weightLabel = type === 'weighted_bodyweight' ? 'Added weight' : 'Weight';
+  const targetPrefix = template ? 'Target ' : '';
+  const weightLabel = `${targetPrefix}${
+    type === 'weighted_bodyweight'
+      ? template
+        ? 'added weight'
+        : 'Added weight'
+      : template
+        ? 'weight'
+        : 'Weight'
+  }`;
 
   const change = (patch: SetPatch) => {
     setInvalidField(null);
@@ -105,7 +115,8 @@ export function SetRow({
   };
 
   const handleToggle = () => {
-    const result = onToggle();
+    if (props.mode === 'template') return;
+    const result = props.onToggle();
     if (result.ok) {
       setInvalidField(null);
       return;
@@ -127,7 +138,7 @@ export function SetRow({
   };
 
   const warnings = softWarnings(set, type, unit);
-  const done = set.completed;
+  const done = !template && set.completed;
 
   return (
     <div
@@ -150,20 +161,22 @@ export function SetRow({
             {badge}
           </span>
         </button>
-        {onFillPrevious ? (
+        {props.mode === 'template' ? (
+          <span className={SET_COL.previous} aria-hidden="true" />
+        ) : props.onFillPrevious ? (
           <button
             type="button"
-            aria-label={`Use previous: ${previousText}`}
-            onClick={onFillPrevious}
+            aria-label={`Use previous: ${props.previousText}`}
+            onClick={props.onFillPrevious}
             className={`${SET_COL.previous} min-h-tap truncate rounded-control text-center text-body-sm tabular-nums text-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent`}
           >
-            {previousText}
+            {props.previousText}
           </button>
         ) : (
           <span
             className={`${SET_COL.previous} truncate text-center text-body-sm tabular-nums text-secondary`}
           >
-            {previousText}
+            {props.previousText}
           </span>
         )}
         {usesWeight && (
@@ -185,7 +198,7 @@ export function SetRow({
         {usesReps && (
           <NumberInput
             ref={repsRef}
-            aria-label={`Reps set ${n}`}
+            aria-label={`${targetPrefix}${template ? 'reps' : 'Reps'} set ${n}`}
             mode="integer"
             value={set.reps}
             format={String}
@@ -201,7 +214,7 @@ export function SetRow({
         {type === 'duration' && (
           <NumberInput
             ref={timeRef}
-            aria-label={`Time set ${n}`}
+            aria-label={`${targetPrefix}${template ? 'time' : 'Time'} set ${n}`}
             mode="duration"
             value={set.durationSec}
             format={formatDurationInput}
@@ -215,21 +228,23 @@ export function SetRow({
             className={`${SET_COL.time} ${done ? 'opacity-70' : ''}`}
           />
         )}
-        <button
-          type="button"
-          aria-label={`Complete set ${n}`}
-          aria-pressed={done}
-          onClick={handleToggle}
-          className={`${SET_COL.check} flex h-11 items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent`}
-        >
-          <span
-            className={`flex h-10 w-10 items-center justify-center rounded-full border-2 ${
-              done ? 'border-accent bg-accent text-on-accent' : 'border-border text-secondary'
-            }`}
+        {props.mode !== 'template' && (
+          <button
+            type="button"
+            aria-label={`Complete set ${n}`}
+            aria-pressed={done}
+            onClick={handleToggle}
+            className={`${SET_COL.check} flex h-11 items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent`}
           >
-            <CheckIcon />
-          </span>
-        </button>
+            <span
+              className={`flex h-10 w-10 items-center justify-center rounded-full border-2 ${
+                done ? 'border-accent bg-accent text-on-accent' : 'border-border text-secondary'
+              }`}
+            >
+              <CheckIcon />
+            </span>
+          </button>
+        )}
       </div>
       {warnings.includes('weight_high') && (
         <p className="pb-1 text-caption text-warning">

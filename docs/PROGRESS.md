@@ -1,6 +1,6 @@
 # Lift — Progress Log
 
-Last updated: 2026-11-14. Branch: `m4-timer-polish`.
+Last updated: 2026-11-14. Branch: `m5-templates`.
 
 ## Done
 - Step 0: repo created, PRD moved to docs/PRD.md, Claude Code config (CLAUDE.md, agents, settings, commands).
@@ -55,8 +55,17 @@ Last updated: 2026-11-14. Branch: `m4-timer-polish`.
   - 4.4b previous column with tap-fill, set-type sheet, swipe delete, RestTimerBar, per-exercise rest, wake lock on the workout screen, Workout settings section (`2d60ce6`).
   - Review fix: the timer re-arms if its timeout fires before the wall clock reaches `endsAt` (`a8c861d`).
 
+  - E2E found that the store could report "ready" before the workout loaded; fixed by waiting for the latest hydrate.
+- M4 merged (PR #5), deployed, and confirmed on the owner's phone (2026-11-14).
+- M5 Templates (branch `m5-templates`, spec docs/milestones/M5-spec.md):
+  - 5.1 generic workoutOps over `ExerciseContainer`, template transforms (`src/lib/templates.ts`), `formatLastUsed`, templates repo; `startWorkout` bumps `lastUsedAt` atomically (`7748549`).
+  - 5.2a template draft store and template mode for SetRow, set table and ExerciseCard (`428c6d4`).
+  - 5.2b templates section on Workout home with preview, start, duplicate, delete (`bed54ef`). 5.2c template editor and routes (`2569b6c`). 5.2d Save as Template from the summary (`ec918cb`).
+  - Review fixes: editing keeps 0-set exercises empty; key-order-safe no-op check after pulls; danger delete button; name maxLength (`cac4f78`).
+  - 5.3 e2e Flow A: template → start → finish → save as template → delete, with remote checks (`4badc42`). 15/15 e2e and 662 unit tests green locally.
+
 ## In progress
-- M4 merge + deploy, then owner device check. E2E found that the store could report "ready" before the workout loaded (reload redirected home and dropped the rest timer); fixed by waiting for the latest hydrate. 14/14 e2e and 585 unit tests green locally.
+- M5 merge + deploy, then owner device check.
 - Known exception to "no unused exports": `pickPreviousWorkout`, `setGroup`, `SetGroup` and `RestPhase` are spec contracts used only in tests or inside their own module.
 
 ## Blocked
@@ -119,4 +128,11 @@ Last updated: 2026-11-14. Branch: `m4-timer-polish`.
   - PREVIOUS matches warm-ups with warm-ups and working sets with working sets, per block.
   - Haptics toggle is hidden when unsupported; keep-awake is disabled when unsupported.
   - No manual timer start; the weight-increment setting is deferred; sound is on by default.
+- 2026-11-14, M5 decisions (accepted architect defaults; reversible):
+  - `TemplateSet.targetDurationSec` added (jsonb, no migration) so timed exercises carry targets.
+  - New, unused templates sort first.
+  - The template editor edits a local draft and saves on Save (Cancel discards; browser back is not guarded).
+  - Starting from a template is blocked while a local workout is active; a workout on another device doesn't block.
+  - Deleting a template never touches workouts.
+  - "Update template from this workout" is deferred to M6/P1; starter PPL templates are deferred to onboarding.
 - Defaults per PRD §16: lb, blue accent `#4F8CFF`, name "Lift".

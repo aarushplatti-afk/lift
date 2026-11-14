@@ -134,6 +134,7 @@ export interface RemoteWorkout {
   id: string;
   status: string;
   ended_at: string | null;
+  template_id: string | null;
   deleted_at: string | null;
   exercises: {
     sets: { weightKg?: number | null; reps?: number | null; completed?: boolean }[];
@@ -150,9 +151,38 @@ export async function readRemoteWorkouts(user: TestUser): Promise<RemoteWorkout[
   if (signInError) throw new Error(`second client sign-in failed: ${signInError.message}`);
   const { data, error } = await client
     .from('workouts')
-    .select('id,status,ended_at,deleted_at,exercises')
+    .select('id,status,ended_at,deleted_at,template_id,exercises')
     .eq('user_id', user.id)
     .limit(500);
   if (error) throw new Error(`workouts read failed: ${error.message}`);
   return data as RemoteWorkout[];
+}
+
+export interface RemoteTemplate {
+  id: string;
+  name: string;
+  last_used_at: string | null;
+  deleted_at: string | null;
+  exercises: {
+    exerciseId: string;
+    order: number;
+    sets: { targetWeightKg?: number; targetReps?: number }[];
+  }[];
+}
+
+/** Reads every templates row (including soft-deleted) for the user via a second signed-in client. */
+export async function readRemoteTemplates(user: TestUser): Promise<RemoteTemplate[]> {
+  const client = anonClient();
+  const { error: signInError } = await client.auth.signInWithPassword({
+    email: user.email,
+    password: user.password,
+  });
+  if (signInError) throw new Error(`second client sign-in failed: ${signInError.message}`);
+  const { data, error } = await client
+    .from('templates')
+    .select('id,name,last_used_at,deleted_at,exercises')
+    .eq('user_id', user.id)
+    .limit(500);
+  if (error) throw new Error(`templates read failed: ${error.message}`);
+  return data as RemoteTemplate[];
 }
