@@ -25,6 +25,10 @@ function WorkoutTitle({ name }: { name: string }) {
     if (draft !== null) rename(draft);
     setDraft(null);
   };
+  const handleChange = (value: string) => {
+    setDraft(value);
+    rename(value);
+  };
   return (
     <input
       aria-label="Workout name"
@@ -35,7 +39,7 @@ function WorkoutTitle({ name }: { name: string }) {
         setDraft(name);
       }}
       onChange={(e) => {
-        setDraft(e.target.value);
+        handleChange(e.target.value);
       }}
       onBlur={commit}
       onKeyDown={(e) => {

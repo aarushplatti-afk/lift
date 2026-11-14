@@ -163,7 +163,7 @@ describe('ActiveWorkout', () => {
     await addBench(user);
     await fillSet(user, 1, '135', '5');
     await user.click(screen.getByRole('button', { name: 'Complete set 1' }));
-    expect(screen.getByRole('button', { name: 'Mark set 1 incomplete' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Complete set 1' })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
@@ -200,6 +200,33 @@ describe('ActiveWorkout', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Discard workout' }));
     expect(await screen.findByRole('button', { name: 'Start Empty Workout' })).toBeInTheDocument();
     expect(await db.workouts.count()).toBe(0);
+  });
+
+  it('persists the name and exercise note on visibility hidden without blur', async () => {
+    const user = userEvent.setup();
+    await seedBench();
+    await startStore();
+    renderApp();
+    await user.click(screen.getByRole('button', { name: 'Start Empty Workout' }));
+    await addBench(user);
+    await user.click(await screen.findByRole('button', { name: 'Bench Press options' }));
+    await user.click(await screen.findByRole('button', { name: 'Add note' }));
+    await user.type(await screen.findByLabelText('Exercise note'), 'felt heavy');
+    const name = screen.getByLabelText('Workout name');
+    await user.clear(name);
+    await user.type(name, 'Push Day');
+
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+    try {
+      await waitFor(async () => {
+        const row = (await db.workouts.toArray())[0];
+        expect(row?.name).toBe('Push Day');
+        expect(row?.exercises[0]?.notes).toBe('felt heavy');
+      });
+    } finally {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+    }
   });
 
   it('minimize flushes and returns home with the banner', async () => {

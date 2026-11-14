@@ -40,7 +40,6 @@ export function ExerciseCard({ we, index, count, exercise, unit }: ExerciseCardP
   const badgeIndex = we.sets.findIndex((s) => s.id === badgeSetId);
 
   const commitNote = () => {
-    if (noteDraft !== null) setExerciseNotes(we.id, noteDraft);
     setNoteDraft(null);
   };
 
@@ -71,6 +70,7 @@ export function ExerciseCard({ we, index, count, exercise, unit }: ExerciseCardP
             value={noteDraft ?? notes}
             onChange={(e) => {
               setNoteDraft(e.target.value);
+              setExerciseNotes(we.id, e.target.value);
             }}
             onBlur={commitNote}
           />

@@ -177,12 +177,13 @@ export function SetRow({ set, index, type, unit, onChange, onToggle, onBadge }: 
             }}
             invalid={invalidField === 'duration'}
             maxLength={8}
+            placeholder="0:00"
             className={`${SET_COL.time} ${done ? 'opacity-70' : ''}`}
           />
         )}
         <button
           type="button"
-          aria-label={done ? `Mark set ${n} incomplete` : `Complete set ${n}`}
+          aria-label={`Complete set ${n}`}
           aria-pressed={done}
           onClick={handleToggle}
           className={`${SET_COL.check} flex h-11 items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent`}

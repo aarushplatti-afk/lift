@@ -25,6 +25,9 @@ export function WorkoutSetTable({ type, unit, children }: WorkoutSetTableProps) 
         {type === 'duration' && <span className={`${SET_COL.time} ${HEAD}`}>Time</span>}
         <span className={`${SET_COL.check} ${HEAD}`}>✓</span>
       </div>
+      {type === 'duration' && (
+        <p className="sr-only">Enter minutes and seconds, e.g. 130 for 1:30</p>
+      )}
       <div className="flex flex-col gap-0.5">{children}</div>
     </div>
   );

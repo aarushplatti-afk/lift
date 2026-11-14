@@ -124,9 +124,9 @@ describe('SetRow completion', () => {
     expect(screen.getByRole('status')).toBeEmptyDOMElement();
   });
 
-  it('completed set exposes pressed state and incomplete label', () => {
+  it('completed set exposes pressed state with a static label', () => {
     renderRow('weight_reps', { set: { weightKg: 50, reps: 5, completed: true } });
-    const btn = screen.getByRole('button', { name: 'Mark set 1 incomplete' });
+    const btn = screen.getByRole('button', { name: 'Complete set 1' });
     expect(btn).toHaveAttribute('aria-pressed', 'true');
   });
 
