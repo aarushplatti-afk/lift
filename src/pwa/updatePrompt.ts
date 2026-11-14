@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { registerSW } from 'virtual:pwa-register';
 import { create } from 'zustand';
 import { isWorkoutActive, useActiveWorkoutStore } from '../store/activeWorkout';
+import { useAuthStore } from '../store/auth';
 
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
@@ -19,6 +20,11 @@ const useUpdateStore = create<UpdateState>(() => ({
 
 let updateSW: ((reload?: boolean) => Promise<void>) | null = null;
 let registered = false;
+let hydratedOnce = false;
+
+useActiveWorkoutStore.subscribe((s) => {
+  if (s.status === 'ready') hydratedOnce = true;
+});
 
 function watchForUpdates(registration: ServiceWorkerRegistration): void {
   const check = () => {
@@ -65,7 +71,10 @@ export function useUpdatePrompt(): {
   const needRefresh = useUpdateStore((s) => s.needRefresh);
   const dismissed = useUpdateStore((s) => s.dismissed);
   const offlineReady = useUpdateStore((s) => s.offlineReady);
-  const active = useActiveWorkoutStore(isWorkoutActive);
+  const workoutActive = useActiveWorkoutStore(isWorkoutActive);
+  const idle = useActiveWorkoutStore((s) => s.status === 'idle');
+  const signedIn = useAuthStore((s) => s.status === 'signedIn');
+  const active = workoutActive || (idle && signedIn && !hydratedOnce);
   return {
     visible: needRefresh && !dismissed && !active,
     offlineReady,

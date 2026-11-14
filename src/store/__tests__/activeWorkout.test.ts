@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '../../db/schema';
 import { setOwner } from '../../db/repos/meta';
 import { useToastStore } from '../../components/ui/toastStore';
+import * as workoutsRepo from '../../db/repos/workouts';
 import { initActiveWorkoutStore, isWorkoutActive, useActiveWorkoutStore } from '../activeWorkout';
 import type { Exercise, WorkoutExercise } from '../../types/domain';
 
@@ -316,5 +317,65 @@ describe('active workout store', () => {
     store().updateSet('we1', 's1', { reps: 2 });
     await vi.advanceTimersByTimeAsync(300);
     await vi.waitFor(() => expect(store().saveError).toBe(false));
+  });
+
+  it('finish that throws keeps the latest edit in Dexie and re-arms the enqueue', async () => {
+    const w = await store().start({ exercises: [block(100, 5)] });
+    store().updateSet('we1', 's1', { reps: 8 });
+    vi.spyOn(workoutsRepo, 'finishWorkout').mockRejectedValueOnce(new Error('boom'));
+    await expect(store().finish({ markIncomplete: false })).rejects.toThrow('boom');
+    expect((await db.workouts.get(w.id))?.exercises[0]?.sets[0]?.reps).toBe(8);
+    expect(store().workout?.exercises[0]?.sets[0]?.reps).toBe(8);
+    expect(await queueCount()).toBe(0);
+    await vi.advanceTimersByTimeAsync(5000);
+    await vi.waitFor(async () => expect(await queueCount()).toBe(1));
+  });
+
+  it('finish returning empty persists pending edits', async () => {
+    const w = await store().start({ exercises: [block()] });
+    store().updateSet('we1', 's1', { reps: 4 });
+    const out = await store().finish({ markIncomplete: false });
+    expect(out).toEqual({ status: 'empty' });
+    expect((await db.workouts.get(w.id))?.exercises[0]?.sets[0]?.reps).toBe(4);
+    await vi.advanceTimersByTimeAsync(5000);
+    await vi.waitFor(async () => expect(await queueCount()).toBe(1));
+  });
+
+  it('discard that throws persists pending edits', async () => {
+    const w = await store().start({ exercises: [block()] });
+    store().updateSet('we1', 's1', { reps: 9 });
+    vi.spyOn(workoutsRepo, 'discardWorkout').mockRejectedValueOnce(new Error('nope'));
+    await expect(store().discard()).rejects.toThrow('nope');
+    expect((await db.workouts.get(w.id))?.exercises[0]?.sets[0]?.reps).toBe(9);
+  });
+
+  it('an Undo for a different workout is ignored', async () => {
+    await store().start({ exercises: [block(60, 8)] });
+    store().addSet('we1');
+    const setId = store().workout?.exercises[0]?.sets[1]?.id ?? '';
+    store().removeSet('we1', setId);
+    const toast = useToastStore.getState().toast;
+    useActiveWorkoutStore.setState({
+      workout: {
+        ...(store().workout as NonNullable<ReturnType<typeof store>['workout']>),
+        id: 'other',
+      },
+    });
+    toast?.onAction?.();
+    expect(store().workout?.exercises[0]?.sets).toHaveLength(1);
+  });
+
+  it('re-hydrate flushes the current workout edits first', async () => {
+    const stop = initActiveWorkoutStore();
+    await vi.waitFor(() => expect(store().status).toBe('ready'));
+    const w = await store().start({ exercises: [block()] });
+    store().updateSet('we1', 's1', { reps: 5 });
+    const save = vi.spyOn(workoutsRepo, 'saveActiveWorkout');
+    await db.meta.delete('activeWorkoutId');
+    await vi.waitFor(() => expect(store().workout).toBeNull());
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(save.mock.calls[0]?.[0].id).toBe(w.id);
+    expect(save.mock.calls[0]?.[0].exercises[0]?.sets[0]?.reps).toBe(5);
+    stop();
   });
 });

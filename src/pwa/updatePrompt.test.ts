@@ -75,6 +75,35 @@ describe('useUpdatePrompt', () => {
     expect(result.current.visible).toBe(true);
   });
 
+  it('suppresses the prompt for a signed-in user until the store first becomes ready', async () => {
+    const { result } = await setup();
+    const { useAuthStore } = await import('../store/auth');
+    const { useActiveWorkoutStore } = await import('../store/activeWorkout');
+    act(() => {
+      useAuthStore.setState({ status: 'signedIn' });
+      callbacks.onNeedRefresh?.();
+    });
+    expect(result.current.visible).toBe(false);
+    act(() => {
+      useActiveWorkoutStore.setState({ status: 'ready' });
+    });
+    expect(result.current.visible).toBe(true);
+    act(() => {
+      useActiveWorkoutStore.setState({ status: 'idle' });
+    });
+    expect(result.current.visible).toBe(true);
+  });
+
+  it('still prompts a signed-out user whose store never initialized', async () => {
+    const { result } = await setup();
+    const { useAuthStore } = await import('../store/auth');
+    act(() => {
+      useAuthStore.setState({ status: 'signedOut' });
+      callbacks.onNeedRefresh?.();
+    });
+    expect(result.current.visible).toBe(true);
+  });
+
   it('apply calls updateSW(true)', async () => {
     const { result } = await setup();
     act(() => {

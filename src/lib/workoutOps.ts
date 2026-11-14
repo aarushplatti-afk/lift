@@ -30,6 +30,7 @@ function mapExercise(
   ctx: OpsCtx,
   fn: (we: WorkoutExercise) => WorkoutExercise,
 ): Workout {
+  if (!w.exercises.some((we) => we.id === weId)) return w;
   return withExercises(
     w,
     w.exercises.map((we) => (we.id === weId ? fn(we) : we)),
@@ -127,6 +128,8 @@ function mapSet(
   ctx: OpsCtx,
   fn: (s: WorkoutSet) => WorkoutSet,
 ): Workout {
+  const found = w.exercises.some((we) => we.id === weId && we.sets.some((s) => s.id === setId));
+  if (!found) return w;
   return mapExercise(w, weId, ctx, (we) => ({
     ...we,
     sets: we.sets.map((s) => (s.id === setId ? fn(s) : s)),

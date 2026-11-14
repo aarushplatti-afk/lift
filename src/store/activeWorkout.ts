@@ -10,7 +10,7 @@ import {
   type FinishOutcome,
   type WorkoutInit,
 } from '../db/repos/workouts';
-import { canCompleteSet, type InvalidField } from '../lib/calc/validation';
+import { canCompleteSet, type CompleteResult } from '../lib/calc/validation';
 import { newId } from '../lib/ids';
 import * as ops from '../lib/workoutOps';
 import type { SetPatch } from '../lib/workoutOps';
@@ -20,8 +20,6 @@ import type { ExerciseType, Workout } from '../types/domain';
 const SAVE_DEBOUNCE_MS = 300;
 const ENQUEUE_DELAY_MS = 5000;
 const SAVE_ERROR_MESSAGE = 'Couldn’t save. Storage may be full.';
-
-export type CompleteResult = { ok: true; completed: boolean } | { ok: false; field: InvalidField };
 
 export interface ActiveWorkoutState {
   status: 'idle' | 'loading' | 'ready';
@@ -127,6 +125,18 @@ function flushNow(): Promise<void> {
   return chain;
 }
 
+async function settleBeforeRepo(w: Workout): Promise<void> {
+  const needSave = saveDirty;
+  resetPersistence();
+  if (needSave) await persistSave(w);
+  await chain;
+}
+
+function rearmPersistence(): void {
+  if (useActiveWorkoutStore.getState().saveError) scheduleSave();
+  scheduleEnqueue();
+}
+
 export const useActiveWorkoutStore = create<ActiveWorkoutState>((set, get) => {
   function mutate(fn: (w: Workout, c: ops.OpsCtx) => Workout): void {
     const w = get().workout;
@@ -156,12 +166,16 @@ export const useActiveWorkoutStore = create<ActiveWorkoutState>((set, get) => {
       const w = get().workout;
       const index = w?.exercises.findIndex((e) => e.id === weId) ?? -1;
       const we = w?.exercises[index];
-      if (!we) return;
+      if (!w || !we) return;
+      const workoutId = w.id;
       mutate((cur, c) => ops.removeExercise(cur, weId, c));
       useToastStore.getState().show({
         message: name ? `Removed ${name}` : 'Exercise removed',
         actionLabel: 'Undo',
-        onAction: () => mutate((cur, c) => ops.restoreExercise(cur, we, index, c)),
+        onAction: () => {
+          if (get().workout?.id !== workoutId) return;
+          mutate((cur, c) => ops.restoreExercise(cur, we, index, c));
+        },
       });
     },
 
@@ -189,12 +203,16 @@ export const useActiveWorkoutStore = create<ActiveWorkoutState>((set, get) => {
       const we = get().workout?.exercises.find((e) => e.id === weId);
       const index = we?.sets.findIndex((s) => s.id === setId) ?? -1;
       const removed = we?.sets[index];
-      if (!removed) return;
+      const workoutId = get().workout?.id;
+      if (!removed || workoutId === undefined) return;
       mutate((w, c) => ops.removeSet(w, weId, setId, c));
       useToastStore.getState().show({
         message: 'Set deleted',
         actionLabel: 'Undo',
-        onAction: () => mutate((w, c) => ops.restoreSet(w, weId, removed, index, c)),
+        onAction: () => {
+          if (get().workout?.id !== workoutId) return;
+          mutate((w, c) => ops.restoreSet(w, weId, removed, index, c));
+        },
       });
     },
 
@@ -206,19 +224,29 @@ export const useActiveWorkoutStore = create<ActiveWorkoutState>((set, get) => {
     async finish(opts) {
       const w = get().workout;
       if (!w) return { status: 'empty' };
-      resetPersistence();
-      await chain;
-      const outcome = await finishWorkout(w, opts);
+      await settleBeforeRepo(w);
+      let outcome: FinishOutcome;
+      try {
+        outcome = await finishWorkout(w, opts);
+      } catch (error) {
+        rearmPersistence();
+        throw error;
+      }
       if (outcome.status === 'finished') set({ workout: null });
+      else rearmPersistence();
       return outcome;
     },
 
     async discard() {
       const w = get().workout;
       if (!w) return;
-      resetPersistence();
-      await chain;
-      await discardWorkout(w.id);
+      await settleBeforeRepo(w);
+      try {
+        await discardWorkout(w.id);
+      } catch (error) {
+        rearmPersistence();
+        throw error;
+      }
       set({ workout: null });
     },
   };
@@ -230,9 +258,9 @@ export function isWorkoutActive(s: ActiveWorkoutState): boolean {
 
 async function hydrate(): Promise<void> {
   const row = await getActiveWorkout();
-  const current = useActiveWorkoutStore.getState().workout;
-  if ((row?.id ?? null) === (current?.id ?? null)) return;
-  resetPersistence();
+  if ((row?.id ?? null) === (useActiveWorkoutStore.getState().workout?.id ?? null)) return;
+  await flushNow();
+  if ((row?.id ?? null) === (useActiveWorkoutStore.getState().workout?.id ?? null)) return;
   useActiveWorkoutStore.setState({ workout: row ?? null });
 }
 

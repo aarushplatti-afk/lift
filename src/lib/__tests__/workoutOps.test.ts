@@ -279,3 +279,15 @@ describe('defaultWorkoutName', () => {
     expect(defaultWorkoutName(at(4))).toBe('Night Workout');
   });
 });
+
+describe('unmatched targets', () => {
+  it('return the same workout when the block or set is not found', () => {
+    const w = base();
+    expect(updateSet(w, 'nope', 's1', { reps: 1 }, ctx())).toBe(w);
+    expect(updateSet(w, 'e1', 'nope', { reps: 1 }, ctx())).toBe(w);
+    expect(setCompleted(w, 'e1', 'nope', true, ctx())).toBe(w);
+    expect(removeSet(w, 'nope', 's1', ctx())).toBe(w);
+    expect(addSet(w, 'nope', ctx())).toBe(w);
+    expect(setExerciseNotes(w, 'nope', 'x', ctx())).toBe(w);
+  });
+});
