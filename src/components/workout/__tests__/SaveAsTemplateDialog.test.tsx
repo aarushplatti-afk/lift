@@ -72,17 +72,17 @@ describe('SaveAsTemplateDialog', () => {
     expect(useToastStore.getState().toast?.message).toBe('Saved “Push Day” as a template');
   });
 
-  it('shows inline errors for empty and too long names', async () => {
+  it('shows an inline error for an empty name and caps the name at 60 characters', async () => {
     const user = userEvent.setup();
     render(<SaveAsTemplateDialog open workout={workout()} onClose={vi.fn()} onSaved={vi.fn()} />);
     const input = screen.getByLabelText('Template name');
     await user.clear(input);
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText('Enter a name')).toBeInTheDocument();
-    await user.type(input, 'x'.repeat(61));
-    await user.click(screen.getByRole('button', { name: 'Save' }));
-    expect(await screen.findByText('Use 60 characters or fewer')).toBeInTheDocument();
     expect(await db.templates.count()).toBe(0);
+    expect(input).toHaveAttribute('maxlength', '60');
+    await user.type(input, 'x'.repeat(61));
+    expect(input).toHaveValue('x'.repeat(60));
   });
 
   it('toasts and closes when there are no completed sets', async () => {
