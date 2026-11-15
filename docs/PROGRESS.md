@@ -1,6 +1,6 @@
 # Lift — Progress Log
 
-Last updated: 2026-11-14. Branch: `m5-templates`.
+Last updated: 2026-11-14. Branch: `m6-history`.
 
 ## Done
 - Step 0: repo created, PRD moved to docs/PRD.md, Claude Code config (CLAUDE.md, agents, settings, commands).
@@ -63,9 +63,17 @@ Last updated: 2026-11-14. Branch: `m5-templates`.
   - 5.2b templates section on Workout home with preview, start, duplicate, delete (`bed54ef`). 5.2c template editor and routes (`2569b6c`). 5.2d Save as Template from the summary (`ec918cb`).
   - Review fixes: editing keeps 0-set exercises empty; key-order-safe no-op check after pulls; danger delete button; name maxLength (`cac4f78`).
   - 5.3 e2e Flow A: template → start → finish → save as template → delete, with remote checks (`4badc42`). 15/15 e2e and 662 unit tests green locally.
+- M5 confirmed by owner on phone.
+- M6 History (branch `m6-history`, spec docs/milestones/M6-spec.md):
+  - History list grouped by month, with PR badges, volume and duration per row; in-progress workouts hidden.
+  - Workout Detail (read-only) with Repeat Workout, Save as Template and Delete Workout.
+  - Workout editor: name, date, start time, duration, notes, exercises, sets, completion; Save and Cancel with dialogs.
+  - PR recompute on edit, delete and finish (`recomputePRsForExercises`): chronological, same-timestamp workouts are peers.
+  - Exercise Detail History tab lists past sessions newest first.
+  - Tests: 790 unit; e2e 16/16 locally (new `e2e/auth/history.spec.ts`).
 
 ## In progress
-- M5 merge + deploy, then owner device check.
+- M6 merge + deploy, then owner device check (check-in milestone).
 - Known exception to "no unused exports": `pickPreviousWorkout`, `setGroup`, `SetGroup` and `RestPhase` are spec contracts used only in tests or inside their own module.
 
 ## Blocked
@@ -135,4 +143,26 @@ Last updated: 2026-11-14. Branch: `m5-templates`.
   - Starting from a template is blocked while a local workout is active; a workout on another device doesn't block.
   - Deleting a template never touches workouts.
   - "Update template from this workout" is deferred to M6/P1; starter PPL templates are deferred to onboarding.
+- 2026-11-14, M6 decisions (accepted architect defaults; reversible; full list H1–H24 in docs/milestones/M6-spec.md §0):
+  - H1: no migration and no Dexie version bump.
+  - H2/H5: `computePRFlags` replaced by `recomputePRsForExercises`. Finishing a workout re-flags later completed workouts whose flags change (e.g. a workout that started earlier but finished later).
+  - H3: same-timestamp workouts are peers; both can be flagged.
+  - H6: each write (update, delete, finish) runs in one Dexie transaction with one outbox entry per changed row.
+  - H7/H11: the editor works on a local draft with explicit Save and Cancel; no autosave to the record. Cancel with changes asks "Discard changes?".
+  - H8: per-exercise rest is not editable in edit mode.
+  - H13: delete is a hard delete locally plus a server tombstone; no undo.
+  - H15: Repeat carries no `templateId`.
+  - H22: no recompute after pull; the writing device recomputes and pushes changed rows.
+  - H23: all completed workouts are kept in memory; no virtualisation (revisit in M10).
+  - H24: vitest is pinned to `TZ=America/New_York`.
+  - History search and filter deferred to M10.
+  - Delete failure toast: "Couldn’t delete. Try again."
+  - Duration validation copy: "Enter a valid duration".
 - Defaults per PRD §16: lb, blue accent `#4F8CFF`, name "Lift".
+
+## Known limitations (M6)
+- R-a: concurrent offline edits of the same workout on two devices can leave PR flags inconsistent. Last writer wins per row. A recompute can re-upsert a stale local row and overwrite an unpulled remote edit of that row. Heals on the next local write touching the exercise.
+- Unsaved editor edits are lost on browser back or OS kill.
+- The minutes field silently clamps values above 59 until blur.
+- History row `aria-label` omits PR and volume.
+- E2E has a fixed 3 s wait after sign-in.
