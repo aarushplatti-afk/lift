@@ -123,7 +123,7 @@ describe('PRs view', () => {
   it('shows the empty state with a start link', async () => {
     renderTab();
     expect(await screen.findByText('No records yet')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Start a workout' }));
+    await userEvent.click(screen.getByRole('link', { name: 'Start a workout' }));
     expect(screen.getByText('Workout home')).toBeInTheDocument();
   });
 

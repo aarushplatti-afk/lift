@@ -45,8 +45,11 @@ export function PRsView() {
         title="No records yet"
         description="Finish a workout to set your first records."
         action={
-          <Link to="/">
-            <Button>Start a workout</Button>
+          <Link
+            to="/"
+            className="inline-flex min-h-tap items-center justify-center rounded-control bg-accent px-4 text-body font-semibold text-on-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:opacity-80"
+          >
+            Start a workout
           </Link>
         }
       />

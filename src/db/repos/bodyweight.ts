@@ -63,9 +63,10 @@ export async function upsertForDate(
 }
 
 export async function deleteEntry(id: string): Promise<BodyweightEntry | undefined> {
+  const uid = await requireUserId();
   return runWrite(['bodyweight_entries'], async () => {
     const existing = await db.bodyweight.get(id);
-    if (!existing) return undefined;
+    if (!existing || existing.userId !== uid) return undefined;
     await db.bodyweight.delete(id);
     await enqueue('bodyweight_entries', id, 'delete');
     return existing;
@@ -73,6 +74,8 @@ export async function deleteEntry(id: string): Promise<BodyweightEntry | undefin
 }
 
 export async function restoreEntry(snapshot: BodyweightEntry): Promise<boolean> {
+  const uid = await requireUserId();
+  if (snapshot.userId !== uid) return false;
   return runWrite(['bodyweight_entries'], async () => {
     const occupied = await db.bodyweight.where('date').equals(snapshot.date).count();
     if (occupied > 0) return false;

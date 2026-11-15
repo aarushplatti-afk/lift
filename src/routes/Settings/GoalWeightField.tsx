@@ -23,6 +23,8 @@ export function GoalWeightField({ goalKg, unit, onSave }: GoalWeightFieldProps) 
   const [error, setError] = useState<string | null>(null);
   const errorId = useId();
 
+  if (pending?.saved && pending.kg === goalKg) setPending(null);
+
   const shownKg = pending ? pending.kg : goalKg;
 
   const commit = () => {
@@ -48,7 +50,7 @@ export function GoalWeightField({ goalKg, unit, onSave }: GoalWeightFieldProps) 
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
       e.preventDefault();
       commit();
     }

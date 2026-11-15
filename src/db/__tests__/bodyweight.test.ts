@@ -224,6 +224,28 @@ describe('restoreEntry', () => {
     expect((await db.bodyweight.get(snap.id))?.weightKg).toBe(75);
     expect(await db.syncQueue.count()).toBe(before);
   });
+
+  it('returns false and writes nothing when the owner changed', async () => {
+    const res = await upsertForDate(D1, 80);
+    if (!res.ok) throw new Error('setup');
+    const snap = await deleteEntry(res.entry.id);
+    if (!snap) throw new Error('setup');
+    await setOwner('u2', 'x@y.z');
+    const before = await db.syncQueue.count();
+    expect(await restoreEntry(snap)).toBe(false);
+    expect(await db.bodyweight.count()).toBe(0);
+    expect(await db.syncQueue.count()).toBe(before);
+  });
+});
+
+describe('deleteEntry owner check', () => {
+  it('does not delete or enqueue a row owned by another user', async () => {
+    await db.bodyweight.put(legacy('other', D1));
+    await setOwner('u2', 'x@y.z');
+    expect(await deleteEntry('other')).toBeUndefined();
+    expect(await db.bodyweight.count()).toBe(1);
+    expect(await db.syncQueue.count()).toBe(0);
+  });
 });
 
 describe('sync paths for bodyweight', () => {

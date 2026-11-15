@@ -375,6 +375,24 @@ describe('entries list', () => {
     });
   });
 
+  it('toasts when Undo cannot restore because the day was logged again', async () => {
+    const e = entry(0, 178);
+    await seed(e);
+    renderView();
+    await screen.findByText('Current');
+    await userEvent.click(rows()[0] as HTMLElement);
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }),
+    );
+    await screen.findByText('Weigh-in deleted');
+    await db.bodyweight.put({ ...e, weightKg: 70, updatedAt: 5 });
+    await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(
+      await screen.findByText('Couldn’t undo — this day was logged again.'),
+    ).toBeInTheDocument();
+    expect((await db.bodyweight.get(e.id))?.weightKg).toBe(70);
+  });
+
   it('uses the same delete and undo handler for the swipe delete button', async () => {
     await seed(entry(3, 180), entry(0, 178));
     renderView();

@@ -11,7 +11,13 @@ export function useDeleteWithUndo(): (entry: BodyweightEntry) => Promise<void> {
       message: 'Weigh-in deleted',
       actionLabel: 'Undo',
       onAction: () => {
-        void restoreEntry(snapshot);
+        void restoreEntry(snapshot).then((restored) => {
+          if (!restored) {
+            useToastStore.getState().show({
+              message: 'Couldn’t undo — this day was logged again.',
+            });
+          }
+        });
       },
     });
   }, []);

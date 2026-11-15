@@ -47,6 +47,37 @@ describe('GoalWeightField', () => {
     expect(onSave).toHaveBeenCalledWith(undefined);
   });
 
+  it('Enter on Clear goal still activates it', async () => {
+    const onSave = vi.fn();
+    render(<GoalWeightField goalKg={80} unit="kg" onSave={onSave} />);
+    screen.getByRole('button', { name: 'Clear goal' }).focus();
+    await userEvent.keyboard('{Enter}');
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave).toHaveBeenCalledWith(undefined);
+  });
+
+  it('shows a goal pulled from another device after a local save', async () => {
+    const onSave = vi.fn();
+    const { rerender } = render(<GoalWeightField unit="kg" onSave={onSave} />);
+    const input = screen.getByRole('textbox', { name: 'Goal weight in kg' });
+    await userEvent.type(input, '80{Enter}');
+    await userEvent.tab();
+    rerender(<GoalWeightField goalKg={80} unit="kg" onSave={onSave} />);
+    expect(input).toHaveValue('80');
+    rerender(<GoalWeightField goalKg={75} unit="kg" onSave={onSave} />);
+    expect(screen.getByRole('textbox', { name: 'Goal weight in kg' })).toHaveValue('75');
+  });
+
+  it('reverts a blank draft on blur without saving', async () => {
+    const onSave = vi.fn();
+    render(<GoalWeightField goalKg={80} unit="kg" onSave={onSave} />);
+    const input = screen.getByRole('textbox', { name: 'Goal weight in kg' });
+    await userEvent.clear(input);
+    await userEvent.tab();
+    expect(onSave).not.toHaveBeenCalled();
+    expect(input).toHaveValue('80');
+  });
+
   it('hides Clear goal when no goal is set', () => {
     render(<GoalWeightField unit="kg" onSave={vi.fn()} />);
     expect(screen.queryByRole('button', { name: 'Clear goal' })).toBeNull();
