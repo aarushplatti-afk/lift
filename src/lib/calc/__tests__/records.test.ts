@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { exerciseRecords, topSet, trainedExercises } from '../records';
+import { buildProgressHistory } from '../../../test/fixtures/progressHistory';
+import { exerciseRecords, recordsByExercise, topSet, trainedExercises } from '../records';
+import type { ExerciseTypes } from '../volume';
+import type { ExerciseType } from '../../../types/domain';
 import { mkEx, mkSet, mkWorkout } from './fixtures';
 
 const EX = 'bench';
@@ -221,5 +224,49 @@ describe('trainedExercises', () => {
     expect(trainedExercises([running, dup])).toEqual([
       { exerciseId: 'b', lastStartedAt: 1000, sessionCount: 1 },
     ]);
+  });
+});
+
+describe('recordsByExercise', () => {
+  function typesOf(exercises: { id: string; type: ExerciseType }[]): ExerciseTypes {
+    return new Map(exercises.map((e) => [e.id, e.type]));
+  }
+
+  it('deep-equals exerciseRecords for every exercise', () => {
+    const { exercises, workouts } = buildProgressHistory({ workoutCount: 500 });
+    const byEx = recordsByExercise(workouts, typesOf(exercises));
+    expect(exercises.length).toBeGreaterThan(0);
+    for (const e of exercises) {
+      expect(byEx.get(e.id) ?? {}).toEqual(exerciseRecords(e.id, workouts, e.type));
+    }
+  });
+
+  it('is empty for empty input and omits exercises without records', () => {
+    expect(recordsByExercise([], new Map([[EX, 'weight_reps']])).size).toBe(0);
+    const w = bench('a', 1000, [mkSet('w', { type: 'warmup', weightKg: 100, reps: 5 })]);
+    expect(recordsByExercise([w], new Map([[EX, 'weight_reps']])).size).toBe(0);
+  });
+
+  it('skips in-progress workouts and exercises with unknown type', () => {
+    const done = bench('a', 1000, [mkSet('s1', { weightKg: 100, reps: 5 })]);
+    const live = bench('b', 2000, [mkSet('s2', { weightKg: 200, reps: 5 })], 'in_progress');
+    expect(recordsByExercise([done, live], new Map()).size).toBe(0);
+    const r = recordsByExercise([done, live], new Map([[EX, 'weight_reps']]));
+    expect(r.get(EX)?.weight?.value).toBe(100);
+  });
+
+  it('keeps the earliest workout on ties regardless of input order', () => {
+    const a = bench('a', 1000, [mkSet('s1', { weightKg: 100, reps: 5 })]);
+    const b = bench('b', 2000, [mkSet('s2', { weightKg: 100, reps: 5 })]);
+    const r = recordsByExercise([b, a], new Map([[EX, 'weight_reps']]));
+    expect(r.get(EX)?.weight?.workoutId).toBe('a');
+  });
+
+  it('handles 2000 workouts in under 250 ms', () => {
+    const { exercises, workouts } = buildProgressHistory({ workoutCount: 2000 });
+    const types = typesOf(exercises);
+    const start = performance.now();
+    recordsByExercise(workouts, types);
+    expect(performance.now() - start).toBeLessThan(250);
   });
 });

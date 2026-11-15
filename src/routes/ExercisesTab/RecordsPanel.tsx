@@ -4,52 +4,21 @@ import { listCompletedWorkouts } from '../../db/repos/workouts';
 import { useLiveQuery } from '../../hooks/useLiveQuery';
 import { useNow } from '../../hooks/useNow';
 import { exerciseRecords } from '../../lib/calc/records';
-import type { RecordEntry } from '../../lib/calc/records';
-import { formatDurationInput } from '../../lib/duration';
-import { formatSetDetail, formatShortDate, formatVolume, formatWeight } from '../../lib/format';
+import { formatSetDetail, formatShortDate } from '../../lib/format';
+import { recordCards } from '../../lib/recordCards';
 import { useSettingsStore } from '../../store/settings';
-import type { Exercise, Unit, Workout } from '../../types/domain';
-
-interface Card {
-  key: string;
-  label: string;
-  entry: RecordEntry;
-  value: string;
-}
-
-function buildCards(exercise: Exercise, workouts: readonly Workout[], unit: Unit): Card[] {
-  const records = exerciseRecords(exercise.id, workouts, exercise.type);
-  const plus = exercise.type === 'weighted_bodyweight' ? '+' : '';
-  const cards: Card[] = [];
-  if (records.weight) {
-    const value = `${plus}${formatWeight(records.weight.value, unit, { withUnit: true })}`;
-    cards.push({ key: 'weight', label: 'Best weight', entry: records.weight, value });
-  }
-  if (records.e1rm) {
-    const value = formatWeight(records.e1rm.value, unit, { withUnit: true });
-    cards.push({ key: 'e1rm', label: 'Best est. 1RM', entry: records.e1rm, value });
-  }
-  if (records.setVolume) {
-    const value = formatVolume(records.setVolume.value, unit);
-    cards.push({ key: 'setVolume', label: 'Best set volume', entry: records.setVolume, value });
-  }
-  if (records.reps) {
-    const value = `${records.reps.value} reps`;
-    cards.push({ key: 'reps', label: 'Most reps', entry: records.reps, value });
-  }
-  if (records.duration) {
-    const value = formatDurationInput(records.duration.value);
-    cards.push({ key: 'duration', label: 'Longest set', entry: records.duration, value });
-  }
-  return cards;
-}
+import type { Exercise, Workout } from '../../types/domain';
 
 export function RecordsPanel({ exercise }: { exercise: Exercise }) {
   const unit = useSettingsStore((s) => s.settings.unit);
   const now = useNow(60000);
   const workouts = useLiveQuery<Workout[] | null>(() => listCompletedWorkouts(), [], null);
   if (workouts === null) return null;
-  const cards = buildCards(exercise, workouts, unit);
+  const cards = recordCards(
+    exerciseRecords(exercise.id, workouts, exercise.type),
+    exercise.type,
+    unit,
+  );
   if (cards.length === 0) {
     return (
       <EmptyState
