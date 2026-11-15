@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '../../db/schema';
 import { enqueue, runWrite } from '../../db/repos/outbox';
+import { deleteWorkout, updateCompletedWorkout } from '../../db/repos/workouts';
 import { wipeLocalData } from '../../db/repos/meta';
 import { DEFAULT_SETTINGS } from '../../db/repos/settings';
-import type { Exercise } from '../../types/domain';
+import type { Exercise, Workout } from '../../types/domain';
 import { pushOutbox } from '../push';
 import { createFakeClient, exerciseRecord, FakeServer } from './fakeClient';
 
@@ -185,6 +186,68 @@ describe('pushOutbox', () => {
     expect(await db.syncQueue.count()).toBe(0);
     await pushOutbox(client, { now: now + 10_000_000, force: false });
     expect(server.upsertCalls).toHaveLength(1);
+  });
+
+  describe('workout history writes', () => {
+    const base = Date.parse('2026-01-01T00:00:00.000Z');
+    const completed = (id: string, day: number, weightKg: number, isPR = false): Workout => ({
+      id,
+      userId: 'u1',
+      name: id,
+      startedAt: base + day * 86_400_000,
+      endedAt: base + day * 86_400_000 + 3_600_000,
+      status: 'completed',
+      createdAt: 1,
+      updatedAt: 1,
+      exercises: [
+        {
+          id: `we-${id}`,
+          exerciseId: 'bench',
+          order: 0,
+          sets: [
+            {
+              id: `s-${id}`,
+              order: 0,
+              type: 'normal',
+              weightKg,
+              reps: 5,
+              completed: true,
+              ...(isPR ? { isPR: true } : {}),
+            },
+          ],
+        },
+      ],
+    });
+
+    beforeEach(async () => {
+      await db.exercises.put(exerciseRecord('bench'));
+      await db.workouts.bulkPut([
+        completed('w1', 1, 100),
+        completed('w2', 2, 110, true),
+        completed('w3', 3, 105),
+      ]);
+    });
+
+    it('a deleted workout pushes a soft-delete tombstone', async () => {
+      await deleteWorkout('w1');
+      const now = Date.parse('2026-03-01T00:00:00.000Z');
+      await pushOutbox(createFakeClient(server), { now, force: true });
+      expect(server.updateCalls).toEqual([
+        { table: 'workouts', values: { deleted_at: '2026-03-01T00:00:00.000Z' }, ids: ['w1'] },
+      ]);
+      expect(await db.syncQueue.count()).toBe(0);
+    });
+
+    it('a recompute pushes every changed row', async () => {
+      const stored = await db.workouts.get('w2');
+      if (!stored) throw new Error('fixture');
+      const lowered: Workout = { ...stored, exercises: completed('w2', 2, 95).exercises };
+      await updateCompletedWorkout(lowered, { markIncomplete: false });
+      const res = await pushOutbox(createFakeClient(server), { now: Date.now(), force: false });
+      expect(res).toEqual({ pushed: 2, failed: 0, offline: false });
+      expect(server.tables.workouts.map((r) => r.id).sort()).toEqual(['w2', 'w3']);
+      expect(await db.syncQueue.count()).toBe(0);
+    });
   });
 
   it('delete in backoff + newer upsert sends only the upsert, clears both, no replay', async () => {
