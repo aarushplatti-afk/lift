@@ -71,3 +71,34 @@ export function formatLastUsed(at: number | undefined, now: number): string {
     ? `Used ${text}`
     : `Used ${text}, ${date.getFullYear()}`;
 }
+
+export function formatWorkoutDate(ms: number, now?: number): string {
+  const d = new Date(ms);
+  const text = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  return now !== undefined && d.getFullYear() !== new Date(now).getFullYear()
+    ? `${text}, ${d.getFullYear()}`
+    : text;
+}
+
+export function formatWorkoutDateTime(ms: number): string {
+  const d = new Date(ms);
+  const date = d.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return `${date} · ${time}`;
+}
+
+export function formatVolume(kg: number, unit: Unit): string {
+  return `${Math.round(toDisplay(kg, unit)).toLocaleString('en-US')} ${unit}`;
+}
+
+export function formatSetDetail(set: WorkoutSet, type: ExerciseType, unit: Unit): string {
+  if (type === 'duration') return formatDurationInput(set.durationSec ?? 0);
+  if (type === 'bodyweight_reps') return `${set.reps ?? 0} reps`;
+  const prefix = type === 'weighted_bodyweight' ? '+' : '';
+  return `${prefix}${formatWeight(set.weightKg ?? 0, unit, { withUnit: true })} × ${set.reps ?? 0}`;
+}

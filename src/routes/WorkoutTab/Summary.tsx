@@ -7,23 +7,14 @@ import { Header } from '../../components/ui/Header';
 import { getWorkout } from '../../db/repos/workouts';
 import { useLiveQuery } from '../../hooks/useLiveQuery';
 import { completedSetCount, workoutVolume } from '../../lib/calc/volume';
-import { formatDurationInput } from '../../lib/duration';
-import { formatDurationShort, formatWeight } from '../../lib/format';
+import { formatDurationShort, formatSetDetail, formatWeight } from '../../lib/format';
 import { useSettingsStore } from '../../store/settings';
-import type { Exercise, Unit, WorkoutExercise, WorkoutSet } from '../../types/domain';
+import type { Exercise, Unit, WorkoutExercise } from '../../types/domain';
 import { toExerciseTypes, useExerciseMap } from './useExerciseMap';
 
 interface PrRow {
   key: string;
   text: string;
-}
-
-function describeSet(set: WorkoutSet, exercise: Exercise | undefined, unit: Unit): string {
-  const type = exercise?.type ?? 'weight_reps';
-  if (type === 'duration') return formatDurationInput(set.durationSec ?? 0);
-  if (type === 'bodyweight_reps') return `${set.reps ?? 0} reps`;
-  const prefix = type === 'weighted_bodyweight' ? '+' : '';
-  return `${prefix}${formatWeight(set.weightKg ?? 0, unit, { withUnit: true })} × ${set.reps ?? 0}`;
 }
 
 function prRows(
@@ -38,7 +29,7 @@ function prRows(
       if (!s.isPR) continue;
       rows.push({
         key: s.id,
-        text: `${exercise?.name ?? 'Deleted exercise'} · ${describeSet(s, exercise, unit)}`,
+        text: `${exercise?.name ?? 'Deleted exercise'} · ${formatSetDetail(s, exercise?.type ?? 'weight_reps', unit)}`,
       });
     }
   }
