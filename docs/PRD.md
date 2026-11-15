@@ -26,7 +26,7 @@ Existing apps (Strong, Hevy) either paywall core features like unlimited routine
 
 ### 1.3 Non-Goals (v1)
 - Nutrition, calorie, or food tracking (explicitly out of scope).
-- Multi-user or team features, admin roles, or public profiles. The app is single-owner; the login exists only to secure that user's data in Supabase.
+- Team features, sharing between accounts, admin roles, or public profiles. Anyone can create their own account (changed 2026-11-15 at the owner's request), but each account sees only its own data; there is no social layer.
 - Social features, sharing, leaderboards.
 - Wearable or HealthKit/Google Fit integration.
 - Workout programs/coaching/AI recommendations.
@@ -375,7 +375,7 @@ Accessed from Workout tab gear icon. Sections:
 - Request **persistent storage** (`navigator.storage.persist()`) on first launch / after first workout to reduce eviction risk; surface a gentle note if denied.
 
 ### 5.6 Onboarding / First-run — P1
-- No signup. On first launch, a single welcome sheet: choose units (lb/kg), optionally enter current bodyweight, and "Add to Home Screen" instructions (iOS: Share → Add to Home Screen; Android: install prompt). Skippable.
+- Sign-up is open: the sign-in screen offers "Create an account" (email + password, confirm password, min 8 characters). After first sign-in, a single welcome sheet: choose units (lb/kg), optionally enter current bodyweight, and "Add to Home Screen" instructions (iOS: Share → Add to Home Screen; Android: install prompt). Skippable.
 - Seed the exercise library silently on first launch.
 - Optionally offer starter templates (Push, Pull, Legs) that the user can accept or skip.
 
@@ -1040,7 +1040,7 @@ This section is authoritative for persistence, auth, and sync. It overrides any 
 |---|---|---|
 | System of record | Supabase Postgres | User wants everything saved to a real database |
 | Offline behavior | **Offline-first**: Dexie cache + outbox, background sync to Supabase | A gym often has bad signal; logging a set must never wait on the network |
-| Auth | Supabase Auth, **email + password**, single owner account | Simple and works inside an installed iOS PWA |
+| Auth | Supabase Auth, **email + password**, open sign-up, one private account per person | Simple and works inside an installed iOS PWA |
 | Security | RLS on every table, owner-only policies, anon key in client | Anon key is public by design; RLS is what protects the data |
 | Conflict policy | Last write wins by server `updated_at` | Single user, rare conflicts |
 | Workout storage | Nested exercises/sets stored as `jsonb` on the `workouts` row | One workout is one atomic sync unit; avoids partial-sync bugs. All charts compute from the local cache |
@@ -1050,7 +1050,7 @@ If the user later prefers online-only (no offline cache), say so before building
 
 ### 19.2 Auth requirements
 - Sign-in screen on first launch: email + password. No magic links and no OAuth redirect flows, because on iOS a link opened from email lands in Safari, not the installed home-screen app, and the session does not carry over.
-- The user creates their one account (dashboard or first sign-up), then **disables new signups** in Supabase Auth settings so nobody else can register.
+- Anyone can create an account from the sign-in screen (changed 2026-11-15; previously single-owner with sign-ups disabled). Owner-only RLS keeps every account's data private. Recommended project settings: "Confirm email" off (the default SMTP sender is heavily rate-limited and confirmation links open in Safari, not the installed app), or, if left on, Site URL and redirect allow-list set to the Pages URL. The app handles both: with confirmation on, it tells the user to confirm and then sign in.
 - Session persists (`persistSession`, `autoRefreshToken`). **If a session exists, the app must open and work fully offline** even if the token cannot be refreshed; refresh when back online. Never force a sign-in screen while offline with a cached session.
 - Sign-out clears the local cache after confirming everything is synced. Signing in as a different user on the same device must wipe the previous user's cache first.
 - Password reset: via Supabase email reset flow, opened in the browser (acceptable for a rare action).
