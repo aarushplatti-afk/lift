@@ -91,7 +91,7 @@ export async function signIn(email: string, password: string): Promise<SignInRes
 
 export const PASSWORD_MIN_LENGTH = 8;
 
-export type SignUpResult =
+type SignUpResult =
   | { ok: true; needsConfirmation: false }
   | { ok: true; needsConfirmation: true }
   | { ok: false; message: string };

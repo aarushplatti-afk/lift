@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { isViewportShort, nudgeLayout, stripAuthRedirectHash } from '../viewportFix';
+import { isEditing, isViewportShort, nudgeLayout, stripAuthRedirectHash } from '../viewportFix';
 
 describe('isViewportShort', () => {
   it('flags a portrait viewport shorter than the screen by the status bar', () => {
@@ -34,6 +34,30 @@ describe('nudgeLayout', () => {
     el.style.display = '';
     nudgeLayout(el);
     expect(el.style.display).toBe('');
+  });
+});
+
+describe('nudgeLayout focus', () => {
+  it('keeps focus on the previously focused button', () => {
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+    const root = document.createElement('div');
+    const btn = document.createElement('button');
+    root.appendChild(btn);
+    document.body.appendChild(root);
+    btn.focus();
+    nudgeLayout(root);
+    expect(document.activeElement).toBe(btn);
+    root.remove();
+  });
+});
+
+describe('isEditing', () => {
+  it('is true for text fields and false for buttons or nothing', () => {
+    expect(isEditing(document.createElement('input'))).toBe(true);
+    expect(isEditing(document.createElement('textarea'))).toBe(true);
+    expect(isEditing(document.createElement('select'))).toBe(true);
+    expect(isEditing(document.createElement('button'))).toBe(false);
+    expect(isEditing(null)).toBe(false);
   });
 });
 

@@ -92,7 +92,7 @@ Last updated: 2026-11-15. Branch: `m8-bodyweight`.
 
 ### Post-M8 phone feedback (branch fix-m8-feedback-signup)
 - Log weight: changing the date no longer clears a typed weight or note. Picking a date that already has an entry still preloads it, as long as the weight field hasn't been typed in.
-- iOS tab bar: the installed app sometimes launched with the viewport short by the status-bar height, so the bar floated above the bottom edge. `src/lib/viewportFix.ts` detects a short viewport in standalone mode (at launch, on resume, after rotation, after the keyboard closes) and forces a re-layout. Unverified on a real device by automation.
+- iOS tab bar: the installed app sometimes launched with the viewport short by the status-bar height, so the bar floated above the bottom edge. `src/lib/viewportFix.ts` detects a short viewport in iOS standalone mode only (at launch, on resume, after rotation, after the keyboard closes; never while a field is focused; gives up after 3 nudges that change nothing) and forces a re-layout, restoring focus and window scroll. Unverified on a real device by automation.
 - Open sign-up: "Create an account" on the sign-in screen (`signUp` in src/sync/auth.ts). Handles both email-confirmation settings and strips Supabase auth tokens from the URL hash. Each account gets its own seeded exercises; RLS already isolates data. PRD §1, §8 and §19 updated.
 
 ## In progress
@@ -100,7 +100,7 @@ Last updated: 2026-11-15. Branch: `m8-bodyweight`.
 - Known exception to "no unused exports": `pickPreviousWorkout`, `setGroup`, `SetGroup` and `RestPhase` are spec contracts used only in tests or inside their own module.
 
 ## Blocked
-- None. (Sign-ups stay ON now. Optional for the owner: turn off "Confirm email" in Supabase Auth → Sign In / Providers → Email.)
+- None. (Sign-ups stay ON now. Optional for the owner in Supabase Auth: turn off "Confirm email", and set minimum password length to 8 to match the app and supabase/config.toml.)
 
 ## Decisions
 - 2026-11-15: Sign-up opened to anyone at the owner's request (app is now multi-user with private per-account data). Recommended: turn off "Confirm email" in Supabase Auth.

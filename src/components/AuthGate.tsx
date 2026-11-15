@@ -6,7 +6,7 @@ import { PASSWORD_MIN_LENGTH, signIn, signUp } from '../sync/auth';
 import { Button } from './ui/Button';
 
 const DIFFERENT_ACCOUNT_WARNING =
-  'This device has unsynced changes from a previous session. If you sign in with a different account, they will be discarded.';
+  'This device has unsynced changes from a previous session. If you sign in to or create a different account, they will be discarded.';
 
 function CenteredMessage({ title, children }: { title: string; children?: ReactNode }) {
   return (

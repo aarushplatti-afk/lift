@@ -19,9 +19,8 @@ export function isViewportShort(s: ViewportSample): boolean {
   return expected - s.innerHeight > TOLERANCE_PX;
 }
 
-function isStandalone(): boolean {
-  const nav = navigator as Navigator & { standalone?: boolean };
-  return nav.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+function isIosStandalone(): boolean {
+  return (navigator as Navigator & { standalone?: boolean }).standalone === true;
 }
 
 function sample(): ViewportSample {
@@ -33,19 +32,40 @@ function sample(): ViewportSample {
   };
 }
 
+export function isEditing(active: Element | null): boolean {
+  if (!(active instanceof HTMLElement)) return false;
+  if (active.isContentEditable) return true;
+  return ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName);
+}
+
 export function nudgeLayout(root: HTMLElement): void {
   const x = window.scrollX;
   const y = window.scrollY;
+  const active = document.activeElement;
   root.style.display = 'none';
   void root.offsetHeight;
   root.style.display = '';
   window.scrollTo(x, y);
+  if (active instanceof HTMLElement && active !== document.body) {
+    active.focus({ preventScroll: true });
+  }
 }
 
+const MAX_INEFFECTIVE_NUDGES = 3;
+
 export function installViewportFix(root: HTMLElement): void {
-  if (!isStandalone()) return;
+  if (!isIosStandalone()) return;
+  let ineffective = 0;
   const check = () => {
-    if (isViewportShort(sample())) nudgeLayout(root);
+    if (ineffective >= MAX_INEFFECTIVE_NUDGES) return;
+    if (isEditing(document.activeElement)) return;
+    const vv = window.visualViewport;
+    if (vv && window.innerHeight - vv.height > 100) return;
+    const before = sample();
+    if (!isViewportShort(before)) return;
+    nudgeLayout(root);
+    if (window.innerHeight === before.innerHeight) ineffective += 1;
+    else ineffective = 0;
   };
   const soon = () => {
     requestAnimationFrame(check);
@@ -55,12 +75,14 @@ export function installViewportFix(root: HTMLElement): void {
   soon();
   window.addEventListener('pageshow', soon);
   window.addEventListener('orientationchange', soon);
-  window.addEventListener('focusout', () => window.setTimeout(check, 150));
+  window.visualViewport?.addEventListener('resize', () => window.setTimeout(check, 150));
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') soon();
   });
 }
 
+// Supabase's implicit flow (detectSessionInUrl is off) returns tokens in the hash,
+// which HashRouter would treat as a route; drop them from the URL and history.
 export function stripAuthRedirectHash(): void {
   const { hash, pathname, search } = window.location;
   if (/^#(access_token|error|error_code)=/.test(hash)) {
