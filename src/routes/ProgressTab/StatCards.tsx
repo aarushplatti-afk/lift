@@ -40,12 +40,14 @@ export function StatCards({
       ? '—'
       : metric === 'volume' && kind === 'kg'
         ? formatVolume(best.value, unit)
-        : formatMetricValue(best.value, kind, unit);
+        : `${metric === 'weight' && type === 'weighted_bodyweight' ? '+' : ''}${formatMetricValue(best.value, kind, unit)}`;
 
   let changeValue = '—';
   let changeDetail = 'Need 2+ workouts';
   if (shown.count >= 2 && shown.first && shown.last) {
-    const change = formatChange(shown.first.value, shown.last.value, kind, unit);
+    const change = formatChange(shown.first.value, shown.last.value, kind, unit, {
+      grouped: metric === 'volume',
+    });
     changeValue = change.abs;
     changeDetail = change.pct;
   }

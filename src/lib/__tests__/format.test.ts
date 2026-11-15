@@ -281,4 +281,17 @@ describe('formatChange', () => {
   it('shows an em dash percentage when the first value is 0', () => {
     expect(formatChange(0, 5, 'count', 'kg')).toEqual({ abs: '+5 reps', pct: '—' });
   });
+  it('rounds the percentage magnitude symmetrically', () => {
+    expect(formatChange(100, 102.5, 'count', 'kg').pct).toBe('+3%');
+    expect(formatChange(100, 97.5, 'count', 'kg').pct).toBe('−3%');
+  });
+  it('formats volume changes as grouped integers when grouped', () => {
+    expect(formatChange(1000, 2234.6, 'kg', 'kg', { grouped: true })).toEqual({
+      abs: '+1,235 kg',
+      pct: '+123%',
+    });
+    expect(formatChange(lbToKg(5000), lbToKg(3000.4), 'kg', 'lb', { grouped: true }).abs).toBe(
+      '−2,000 lb',
+    );
+  });
 });

@@ -1,6 +1,6 @@
 import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createExercise } from '../../../db/repos/exercises';
 import { setOwner, wipeLocalData } from '../../../db/repos/meta';
@@ -81,9 +81,15 @@ async function seedBench(): Promise<string> {
   return bench;
 }
 
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="search">{location.search}</output>;
+}
+
 function renderTab(path = '/progress') {
   return render(
     <MemoryRouter initialEntries={[path]}>
+      <LocationProbe />
       <Routes>
         <Route path="/progress" element={<ProgressTab />} />
         <Route path="/history/:id" element={<div>History detail</div>} />
@@ -278,6 +284,50 @@ describe('Exercises view', () => {
     expect(
       await screen.findByRole('button', { name: 'Exercise: Barbell Bench Press. Change' }),
     ).toBeVisible();
+  });
+
+  it('clears the deep link param so a later selection survives a remount', async () => {
+    const bench = await seedBench();
+    const squat = await seedExercise('Squat');
+    await db.workouts.put(workout('s1', 1, squat, [{ lb: 315, reps: 3 }]));
+    const first = renderTab(`/progress?exercise=${bench}`);
+    await screen.findByRole('button', { name: 'Exercise: Barbell Bench Press. Change' });
+    expect(screen.getByTestId('search').textContent).toBe('');
+    await userEvent.click(screen.getByRole('button', { name: /^Exercise: Barbell Bench Press/ }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByText('Squat'));
+    first.unmount();
+    renderTab();
+    expect(await screen.findByRole('button', { name: 'Exercise: Squat. Change' })).toBeVisible();
+  });
+
+  it('renders the content inside a main landmark', async () => {
+    renderTab();
+    expect(screen.getByRole('main')).toBeInTheDocument();
+  });
+
+  it('prefixes Current best with + for weighted bodyweight weight only', async () => {
+    const pull = await seedExercise('Weighted Pull-Up', 'weighted_bodyweight');
+    await db.workouts.bulkPut([
+      workout('wp1', 20, pull, [{ lb: 25, reps: 8 }]),
+      workout('wp2', 3, pull, [{ lb: 45, reps: 5 }]),
+    ]);
+    renderTab();
+    await screen.findByText('Current best');
+    expect(tile('Current best')).toHaveTextContent('+45 lb');
+    await userEvent.click(screen.getByRole('radio', { name: 'Est. 1RM' }));
+    expect(tile('Current best')).not.toHaveTextContent('+');
+  });
+
+  it('shows the volume change grouped as an integer', async () => {
+    const bench = await seedExercise('Bench');
+    await db.workouts.bulkPut([
+      workout('v1', 20, bench, [{ lb: 100, reps: 10 }]),
+      workout('v2', 3, bench, [{ lb: 200, reps: 12 }]),
+    ]);
+    renderTab();
+    await screen.findByText('Current best');
+    await userEvent.click(screen.getByRole('radio', { name: 'Volume' }));
+    expect(tile('Change · 3M')).toHaveTextContent('+1,400 lb');
   });
 
   it('keeps the selection across unmount and remount', async () => {

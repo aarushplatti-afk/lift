@@ -16,7 +16,7 @@ const VIEWS: readonly { value: ProgressView; label: string }[] = [
 export function ProgressTab() {
   const view = useProgressViewStore((s) => s.view);
   const setView = useProgressViewStore((s) => s.setView);
-  const [params] = useSearchParams();
+  const [params, setSearchParams] = useSearchParams();
   const deepLink = params.get('exercise');
 
   useEffect(() => {
@@ -24,15 +24,14 @@ export function ProgressTab() {
       const store = useProgressViewStore.getState();
       store.setExercise(deepLink);
       store.setView('exercises');
+      setSearchParams({}, { replace: true });
     }
-    // The deep link applies on mount only; the URL is not kept in sync afterwards.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [deepLink, setSearchParams]);
 
   return (
     <>
       <Header title="Progress" />
-      <div className="flex flex-col gap-4 px-4 py-4">
+      <main className="flex flex-col gap-4 px-4 py-4">
         <SegmentedControl<ProgressView>
           label="Progress views"
           options={VIEWS}
@@ -52,7 +51,7 @@ export function ProgressTab() {
             description="A full records list is coming soon. Each exercise’s Records tab shows its bests today."
           />
         ) : null}
-      </div>
+      </main>
     </>
   );
 }

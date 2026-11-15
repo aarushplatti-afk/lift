@@ -135,17 +135,21 @@ export function formatChange(
   last: number,
   kind: ValueKind,
   unit: Unit,
+  options: { grouped?: boolean } = {},
 ): { abs: string; pct: string } {
   const a = kind === 'kg' ? toDisplay(first, unit) : first;
   const b = kind === 'kg' ? toDisplay(last, unit) : last;
-  const diff = Math.round((b - a) * 10) / 10;
+  const grouped = kind === 'kg' && options.grouped === true;
+  const diff = grouped ? Math.round(b - a) : Math.round((b - a) * 10) / 10;
   const mag = Math.abs(diff);
   let body: string;
-  if (kind === 'kg') body = `${String(mag)} ${unit}`;
+  if (grouped) body = `${mag.toLocaleString('en-US')} ${unit}`;
+  else if (kind === 'kg') body = `${String(mag)} ${unit}`;
   else if (kind === 'count') body = `${String(mag)} reps`;
   else body = formatDurationInput(mag);
   const abs = signed(diff, body);
   if (a === 0) return { abs, pct: '—' };
-  const pctValue = Math.round((diff / Math.abs(a)) * 100);
-  return { abs, pct: signed(pctValue, `${Math.abs(pctValue)}%`) };
+  const raw = ((b - a) / Math.abs(a)) * 100;
+  const pctMag = Math.round(Math.abs(raw));
+  return { abs, pct: signed(pctMag === 0 ? 0 : Math.sign(raw), `${pctMag}%`) };
 }
