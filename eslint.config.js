@@ -13,6 +13,11 @@ const dexiePath = {
   message: 'Only src/db/** and src/hooks/useLiveQuery.ts may import Dexie.',
 };
 
+const rechartsPath = {
+  name: 'recharts',
+  message: 'Only src/components/charts/** may import Recharts (it is code-split).',
+};
+
 export default tseslint.config(
   {
     ignores: ['dist', 'coverage', 'playwright-report', 'test-results', 'supabase/.temp', 'dev-dist'],
@@ -30,6 +35,12 @@ export default tseslint.config(
   },
   {
     files: ['src/**/*.{ts,tsx}', 'tests/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', { paths: [supabasePath, dexiePath, rechartsPath] }],
+    },
+  },
+  {
+    files: ['src/components/charts/**/*.{ts,tsx}'],
     rules: { 'no-restricted-imports': ['error', { paths: [supabasePath, dexiePath] }] },
   },
   {
