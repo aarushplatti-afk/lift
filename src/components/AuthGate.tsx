@@ -1,12 +1,12 @@
 import { useState, type ReactNode } from 'react';
-import { SignInScreen } from '../routes/SignIn/SignInScreen';
+import { SignInScreen, type AuthMode } from '../routes/SignIn/SignInScreen';
 import { useAuthStore } from '../store/auth';
 import { useSyncStore } from '../store/sync';
-import { signIn } from '../sync/auth';
+import { PASSWORD_MIN_LENGTH, signIn, signUp } from '../sync/auth';
 import { Button } from './ui/Button';
 
 const DIFFERENT_ACCOUNT_WARNING =
-  'This device has unsynced changes from a previous session. If you sign in with a different account, they will be discarded.';
+  'This device has unsynced changes from a previous session. If you sign in to or create a different account, they will be discarded.';
 
 function CenteredMessage({ title, children }: { title: string; children?: ReactNode }) {
   return (
@@ -19,22 +19,47 @@ function CenteredMessage({ title, children }: { title: string; children?: ReactN
 
 function SignedOut() {
   const pending = useSyncStore((s) => s.status.pendingCount);
+  const [mode, setMode] = useState<AuthMode>('signin');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
+  const [info, setInfo] = useState<string | undefined>();
 
   const onSubmit = async (email: string, password: string): Promise<void> => {
     setBusy(true);
     setError(undefined);
-    const result = await signIn(email, password);
-    if (!result.ok) setError(result.message);
-    setBusy(false);
+    setInfo(undefined);
+    try {
+      if (mode === 'signin') {
+        const result = await signIn(email, password);
+        if (!result.ok) setError(result.message);
+        return;
+      }
+      const result = await signUp(email, password);
+      if (!result.ok) setError(result.message);
+      else if (result.needsConfirmation) {
+        setMode('signin');
+        setInfo(`Account created. Check ${email} for a confirmation link, then sign in here.`);
+      }
+    } catch {
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
     <SignInScreen
+      mode={mode}
+      onModeChange={(next) => {
+        setMode(next);
+        setError(undefined);
+        setInfo(undefined);
+      }}
       onSubmit={onSubmit}
       busy={busy}
       error={error}
+      info={info}
+      passwordMinLength={PASSWORD_MIN_LENGTH}
       warning={pending > 0 ? DIFFERENT_ACCOUNT_WARNING : undefined}
     />
   );

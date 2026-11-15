@@ -24,6 +24,8 @@ vi.mock('./sync/engine', () => ({
 }));
 vi.mock('./sync/triggers', () => ({ startSyncTriggers: () => () => undefined }));
 vi.mock('./sync/auth', () => ({
+  PASSWORD_MIN_LENGTH: 8,
+  signUp: vi.fn(() => Promise.resolve({ ok: true, needsConfirmation: false })),
   signIn: vi.fn(() => Promise.resolve({ ok: true })),
   getCachedSession: vi.fn(() => new Promise(() => undefined)),
   onAuthChange: () => () => undefined,

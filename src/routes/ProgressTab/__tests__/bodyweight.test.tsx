@@ -181,6 +181,18 @@ describe('empty state and log card', () => {
     expect(screen.getByRole('button', { name: 'Update' })).toBeInTheDocument();
   });
 
+  it('keeps a typed weight when the date is changed afterwards', async () => {
+    renderView();
+    await screen.findByText('No weigh-ins yet');
+    await typeWeight('181.2');
+    const past = dateAgo(2);
+    await userEvent.clear(dateInput());
+    await userEvent.type(dateInput(), past);
+    expect(weightInput()).toHaveValue('181.2');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect((await db.bodyweight.get(bodyweightId(OWNER, past)))?.weightKg).toBe(82.191);
+  });
+
   it('limits the date to today and disables Save when it is cleared', async () => {
     await seed(entry(1, 180));
     renderView();

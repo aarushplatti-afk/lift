@@ -6,6 +6,7 @@ import { enqueue, runWrite } from '../../db/repos/outbox';
 const auth = {
   getSession: vi.fn(),
   signInWithPassword: vi.fn(),
+  signUp: vi.fn(),
   signOut: vi.fn(() => Promise.resolve({ error: null })),
   onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
 };
@@ -14,7 +15,7 @@ const syncNow = vi.fn(() => Promise.resolve());
 vi.mock('../../lib/supabase', () => ({ getSupabase: () => ({ auth }) }));
 vi.mock('../engine', () => ({ getSyncEngine: () => ({ syncNow }) }));
 
-const { getCachedSession, signIn, signOut } = await import('../auth');
+const { getCachedSession, signIn, signOut, signUp } = await import('../auth');
 
 beforeEach(async () => {
   await Promise.all(db.tables.map((t) => t.clear()));
@@ -127,5 +128,53 @@ describe('signOut', () => {
     expect(await signOut({ discardUnsynced: true })).toEqual({ ok: true });
     expect(auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
     expect(await db.syncQueue.count()).toBe(0);
+  });
+});
+
+describe('signUp', () => {
+  it('adopts the new identity and syncs when a session is returned', async () => {
+    auth.signUp.mockResolvedValue({
+      data: { user: { id: 'n1', email: 'n@b.c', identities: [{}] }, session: {} },
+      error: null,
+    });
+    expect(await signUp('n@b.c', 'longenough')).toEqual({ ok: true, needsConfirmation: false });
+    expect(await meta.getOwner()).toEqual({ userId: 'n1', email: 'n@b.c' });
+    expect(syncNow).toHaveBeenCalledWith('signin');
+  });
+
+  it('reports that email confirmation is needed when no session comes back', async () => {
+    auth.signUp.mockResolvedValue({
+      data: { user: { id: 'n1', email: 'n@b.c', identities: [{}] }, session: null },
+      error: null,
+    });
+    expect(await signUp('n@b.c', 'longenough')).toEqual({ ok: true, needsConfirmation: true });
+    expect(await meta.getOwner()).toBeUndefined();
+    expect(syncNow).not.toHaveBeenCalled();
+  });
+
+  it('rejects a short password without calling Supabase', async () => {
+    const result = await signUp('n@b.c', 'short');
+    expect(result.ok).toBe(false);
+    expect(auth.signUp).not.toHaveBeenCalled();
+  });
+
+  it('maps an existing account to a sign-in hint', async () => {
+    auth.signUp.mockResolvedValue({
+      data: { user: null, session: null },
+      error: { message: 'User already registered', code: 'user_already_exists', status: 422 },
+    });
+    expect(await signUp('n@b.c', 'longenough')).toEqual({
+      ok: false,
+      message: 'An account with this email already exists. Sign in instead.',
+    });
+  });
+
+  it('treats an obfuscated existing user (no identities) as already registered', async () => {
+    auth.signUp.mockResolvedValue({
+      data: { user: { id: 'x', email: 'n@b.c', identities: [] }, session: null },
+      error: null,
+    });
+    const result = await signUp('n@b.c', 'longenough');
+    expect(result.ok).toBe(false);
   });
 });

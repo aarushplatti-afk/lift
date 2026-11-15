@@ -97,7 +97,6 @@ export function LogWeightCard({ entries, unit, now, weightInputRef }: LogWeightC
         max={today}
         onChange={(e) => {
           setPickedDate(e.target.value);
-          resetTouched();
         }}
       />
       <TextInput

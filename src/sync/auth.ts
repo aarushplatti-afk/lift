@@ -89,6 +89,70 @@ export async function signIn(email: string, password: string): Promise<SignInRes
   return { ok: true };
 }
 
+export const PASSWORD_MIN_LENGTH = 8;
+
+type SignUpResult =
+  | { ok: true; needsConfirmation: false }
+  | { ok: true; needsConfirmation: true }
+  | { ok: false; message: string };
+
+function signUpError(error: { message: string; status?: number; code?: string }): string {
+  if (!navigator.onLine || /fetch|network/i.test(error.message)) {
+    return 'You appear to be offline. Connect to the internet to create an account.';
+  }
+  switch (error.code) {
+    case 'user_already_exists':
+    case 'email_exists':
+      return 'An account with this email already exists. Sign in instead.';
+    case 'weak_password':
+      return `Choose a stronger password (at least ${String(PASSWORD_MIN_LENGTH)} characters).`;
+    case 'email_address_invalid':
+      return 'Enter a valid email address.';
+    case 'signup_disabled':
+      return 'New accounts are turned off for this app.';
+    case 'over_email_send_rate_limit':
+    case 'over_request_rate_limit':
+      return 'Too many sign-up attempts. Wait a few minutes and try again.';
+    default:
+      return 'Could not create the account. Please try again.';
+  }
+}
+
+export async function signUp(email: string, password: string): Promise<SignUpResult> {
+  if (!navigator.onLine) {
+    return {
+      ok: false,
+      message: 'You appear to be offline. Connect to the internet to create an account.',
+    };
+  }
+  if (password.length < PASSWORD_MIN_LENGTH) {
+    return {
+      ok: false,
+      message: `Password must be at least ${String(PASSWORD_MIN_LENGTH)} characters.`,
+    };
+  }
+  const { data, error } = await getSupabase().auth.signUp({
+    email,
+    password,
+    options: { emailRedirectTo: `${window.location.origin}${window.location.pathname}` },
+  });
+  if (error || !data.user) {
+    return {
+      ok: false,
+      message: signUpError(error ?? { message: 'Could not create the account.' }),
+    };
+  }
+  if (data.user.identities?.length === 0) {
+    return { ok: false, message: 'An account with this email already exists. Sign in instead.' };
+  }
+  if (!data.session) return { ok: true, needsConfirmation: true };
+  const identity: AuthIdentity = { userId: data.user.id, email: data.user.email ?? email };
+  await adoptIdentity(identity);
+  emit(identity);
+  void getSyncEngine().syncNow('signin');
+  return { ok: true, needsConfirmation: false };
+}
+
 export async function signOut(opts: { discardUnsynced: boolean }): Promise<SignOutResult> {
   if (navigator.onLine) {
     try {
