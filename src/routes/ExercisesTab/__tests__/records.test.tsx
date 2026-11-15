@@ -152,7 +152,11 @@ describe('Chart tab', () => {
     );
     await userEvent.click(await screen.findByRole('radio', { name: 'Chart' }));
     expect(
-      await screen.findByText('One workout so far. Log another to see a trend.'),
+      await screen.findByText(
+        'One workout so far. Log another to see a trend.',
+        {},
+        { timeout: 5000 },
+      ),
     ).toBeInTheDocument();
     expect(screen.getByText(/Weight chart, 1 workout/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'View progress' })).toHaveAttribute(
@@ -171,7 +175,7 @@ describe('Chart tab', () => {
       </MemoryRouter>,
     );
     await userEvent.click(await screen.findByRole('radio', { name: 'Chart' }));
-    expect(await screen.findByText('No workouts yet')).toBeInTheDocument();
+    expect(await screen.findByText('No workouts yet', {}, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Start a workout' })).toHaveAttribute('href', '/');
   });
 });

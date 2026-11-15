@@ -153,3 +153,15 @@ export function formatChange(
   const pctMag = Math.round(Math.abs(raw));
   return { abs, pct: signed(pctMag === 0 ? 0 : Math.sign(raw), `${pctMag}%`) };
 }
+
+export function formatBodyweightChange(
+  firstKg: number,
+  lastKg: number,
+  unit: Unit,
+): { value: string; detail: string } {
+  const { abs, pct } = formatChange(firstKg, lastKg, 'kg', unit);
+  let value = abs;
+  if (abs.startsWith('+')) value = `↑ ${abs.slice(1)}`;
+  else if (abs.startsWith(MINUS)) value = `↓ ${abs.slice(1)}`;
+  return { value, detail: pct };
+}

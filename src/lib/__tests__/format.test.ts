@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   formatDurationShort,
   formatElapsed,
+  formatBodyweightChange,
   formatChange,
   formatLastUsed,
   formatMetricValue,
@@ -293,5 +294,33 @@ describe('formatChange', () => {
     expect(formatChange(lbToKg(5000), lbToKg(3000.4), 'kg', 'lb', { grouped: true }).abs).toBe(
       '−2,000 lb',
     );
+  });
+});
+
+describe('formatBodyweightChange', () => {
+  it('shows a down arrow for loss in lb with negative pct', () => {
+    const r = formatBodyweightChange(lbToKg(180), lbToKg(177.6), 'lb');
+    expect(r.value).toBe('↓ 2.4 lb');
+    expect(r.detail).toBe('−1%');
+  });
+
+  it('shows an up arrow for gain in lb with positive pct', () => {
+    const r = formatBodyweightChange(lbToKg(100), lbToKg(101), 'lb');
+    expect(r.value).toBe('↑ 1 lb');
+    expect(r.detail).toBe('+1%');
+  });
+
+  it('works in kg', () => {
+    expect(formatBodyweightChange(80, 82.5, 'kg')).toEqual({ value: '↑ 2.5 kg', detail: '+3%' });
+    expect(formatBodyweightChange(80, 77.5, 'kg')).toEqual({ value: '↓ 2.5 kg', detail: '−3%' });
+  });
+
+  it('shows plain zero without arrow or sign', () => {
+    expect(formatBodyweightChange(80, 80, 'kg')).toEqual({ value: '0 kg', detail: '0%' });
+    expect(formatBodyweightChange(lbToKg(150), lbToKg(150), 'lb').value).toBe('0 lb');
+  });
+
+  it('treats sub-display-precision changes as zero', () => {
+    expect(formatBodyweightChange(80, 80.01, 'kg').value).toBe('0 kg');
   });
 });
