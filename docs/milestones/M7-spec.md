@@ -215,7 +215,7 @@ Entry chunk lacks `recharts-surface`; a separate chunk has it. Record both gz si
 
 ### E2E Flow C (`e2e/auth/flow-c.spec.ts`, 390×844)
 1. Create user, sign in, wait for seeding; get "Barbell Bench Press" id via `readRemoteExercises`.
-2. `insertRemoteWorkouts(user, rows)` (supabase-js as that user via RLS; never service-role) adds 4 completed Bench workouts at now − 150 d (185×5), − 60 d (205×5), − 30 d (215×5), − 10 d (warm-up 245×1 + 225×5); weights `fromDisplay(x, 'lb')`. Trigger pull (Settings "Sync now" or reload).
+2. `insertRemoteWorkouts(user, rows)` (supabase-js as that user via RLS; never service-role) adds 4 completed Bench workouts at now − 150 d (185×5), − 60 d (205×5), − 40 d (215×5), − 10 d (warm-up 245×1 + 225×5); weights `fromDisplay(x, 'lb')`. Trigger pull (Settings "Sync now" or reload).
 3. Progress → Exercises; selector, type "Bench Press", tap "Barbell Bench Press". Weight chip pressed, range 3M.
 4. 3 dots. Current best "225 lb" (245 warm-up excluded). Change "+20 lb" / "+10%". Workouts "4". Last performed "1 week ago".
 5. Est. 1RM chip → Current best "262.5 lb".
@@ -224,7 +224,7 @@ Entry chunk lacks `recharts-surface`; a separate chunk has it. Record both gz si
 8. 1M → fallback hint, 4 dots.
 9. First recent-session row links to `/history/:id`.
 10. Settings → kg, back to Progress (selection remembered): Current best "119.1 kg".
-11. Exercises → Barbell Bench Press → Records: "102.1 kg", "119.1 kg", "510.3 kg", each with date. Chart tab → "View progress" opens Progress with Bench selected.
+11. Exercises → Barbell Bench Press → Records: "102.1 kg", "119.1 kg", "510 kg", each with date. Chart tab → "View progress" opens Progress with Bench selected.
 
 ### Perf e2e (`e2e/auth/progress-perf.spec.ts`, tagged/skippable)
 Insert 2000-workout Bench fixture (batches of 500), pull. First dot within 1500 ms of tab tap; All → 3M within 500 ms; dots in All ≤ 500; no long task > 200 ms during range switch.

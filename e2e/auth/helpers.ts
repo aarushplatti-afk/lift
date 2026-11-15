@@ -191,3 +191,47 @@ export async function readRemoteTemplates(user: TestUser): Promise<RemoteTemplat
   if (error) throw new Error(`templates read failed: ${error.message}`);
   return data as RemoteTemplate[];
 }
+
+export interface RemoteWorkoutInsert {
+  id: string;
+  name: string;
+  started_at: string;
+  ended_at: string | null;
+  status: 'completed' | 'in_progress';
+  exercises: {
+    id: string;
+    exerciseId: string;
+    order: number;
+    sets: {
+      id: string;
+      order: number;
+      type: 'normal' | 'warmup' | 'drop' | 'failure';
+      weightKg?: number;
+      reps?: number;
+      durationSec?: number;
+      completed: boolean;
+      completedAt?: number;
+    }[];
+  }[];
+}
+
+/**
+ * Inserts workouts as the given user through RLS (anon key plus that user's session).
+ * Rows are sent in batches of 500 to keep request bodies small.
+ */
+export async function insertRemoteWorkouts(
+  user: TestUser,
+  rows: readonly RemoteWorkoutInsert[],
+): Promise<void> {
+  const client = anonClient();
+  const { error: signInError } = await client.auth.signInWithPassword({
+    email: user.email,
+    password: user.password,
+  });
+  if (signInError) throw new Error(`second client sign-in failed: ${signInError.message}`);
+  for (let i = 0; i < rows.length; i += 500) {
+    const batch = rows.slice(i, i + 500).map((r) => ({ ...r, user_id: user.id }));
+    const { error } = await client.from('workouts').insert(batch);
+    if (error) throw new Error(`workouts insert failed: ${error.message}`);
+  }
+}

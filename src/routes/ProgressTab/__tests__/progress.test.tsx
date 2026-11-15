@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -294,5 +294,29 @@ describe('Exercises view', () => {
       await screen.findByRole('button', { name: 'Exercise: Barbell Bench Press. Change' }),
     ).toBeVisible();
     expect(screen.getByRole('radio', { name: '6M' })).toBeChecked();
+  });
+
+  it('re-renders values in kg when the unit changes', async () => {
+    await seedBench();
+    renderTab();
+    await screen.findByText('Current best');
+    expect(tile('Current best')).toHaveTextContent('225 lb');
+    act(() => {
+      useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, unit: 'kg' }, hydrated: true });
+    });
+    expect(tile('Current best')).toHaveTextContent('102.1 kg');
+    expect(tile('Change · 3M')).toHaveTextContent('+9.1 kg');
+    expect(tile('Change · 3M')).toHaveTextContent('+10%');
+    await userEvent.click(screen.getByRole('radio', { name: 'Est. 1RM' }));
+    expect(tile('Current best')).toHaveTextContent('119.1 kg');
+  });
+
+  it('shows the no-data state for a metric with no points while keeping the recent sessions', async () => {
+    const pull = await seedExercise('Weighted Pull-Up', 'weighted_bodyweight');
+    await db.workouts.put(workout('wp1', 3, pull, [{ lb: 0, reps: 8 }]));
+    renderTab();
+    expect(await screen.findByText('No Added weight data yet')).toBeInTheDocument();
+    expect(screen.getByText('Try another metric.')).toBeInTheDocument();
+    expect(screen.getByText('Recent sessions')).toBeInTheDocument();
   });
 });
