@@ -44,6 +44,34 @@ export async function applyServerRecords<T extends SyncTable>(
   });
 }
 
+export async function discardAndApply<T extends SyncTable>(
+  table: T,
+  recordId: string,
+  item: { record: SyncRecordMap[T]; deleted: boolean } | null,
+  userId: string,
+): Promise<void> {
+  const localName = LOCAL_TABLE[table];
+  await db.transaction('rw', [localName, 'syncQueue', 'meta'], async () => {
+    await assertOwner(userId);
+    const local = db.table<SyncRecordMap[T], string>(localName);
+    await db.syncQueue.where('[table+recordId]').equals([table, recordId]).delete();
+    if (table === 'workouts') {
+      const activeRow = await db.meta.get('activeWorkoutId');
+      if (activeRow?.key === 'activeWorkoutId' && activeRow.value === recordId) return;
+    }
+    if (!item || item.deleted) {
+      await local.delete(recordId);
+      return;
+    }
+    if (table === 'bodyweight_entries') {
+      const date = (item.record as SyncRecordMap['bodyweight_entries']).date;
+      const clashes = await db.bodyweight.where('date').equals(date).primaryKeys();
+      await db.bodyweight.bulkDelete(clashes.filter((id) => id !== item.record.id));
+    }
+    await local.put(item.record);
+  });
+}
+
 export async function getCursor(
   table: SyncTable,
 ): Promise<{ at: string | null; key: string | null }> {

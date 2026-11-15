@@ -4,6 +4,11 @@ import type { Tables } from '../types/database';
 import type { SyncTable } from '../types/sync';
 import { fromRow } from './mappers';
 import { isNetworkError, OfflineError } from './push';
+import { SyncRequestError } from './retry';
+
+type AuthRetry = <T>(fn: () => Promise<T>) => Promise<T>;
+
+const passThrough: AuthRetry = (fn) => fn();
 
 interface PullRow {
   updated_at: string;
@@ -13,7 +18,8 @@ interface PullRow {
 
 interface PullQuery extends PromiseLike<{
   data: PullRow[] | null;
-  error: { message: string } | null;
+  error: { message: string; code?: string } | null;
+  status?: number;
 }> {
   eq(col: string, value: string): PullQuery;
   or(filter: string): PullQuery;
@@ -42,6 +48,7 @@ export async function pullTable(
   table: SyncTable,
   userId: string,
   pageSize = 500,
+  authRetry: AuthRetry = passThrough,
 ): Promise<number> {
   const keyCol = table === 'user_settings' ? 'user_id' : 'id';
   let total = 0;
@@ -55,16 +62,20 @@ export async function pullTable(
       .order('updated_at', { ascending: true })
       .order(keyCol, { ascending: true })
       .limit(pageSize);
-    let result: Awaited<typeof query>;
+    const request = query;
+    let result: Awaited<typeof request>;
     try {
-      result = await query;
+      result = await authRetry(async () => {
+        const res = await request;
+        if (res.error) {
+          if (isNetworkError(res.error.message)) throw new OfflineError('offline');
+          throw new SyncRequestError(res.error.message, res.status, res.error.code);
+        }
+        return res;
+      });
     } catch (err) {
       if (isNetworkError(err)) throw new OfflineError('offline');
       throw err;
-    }
-    if (result.error) {
-      if (isNetworkError(result.error.message)) throw new OfflineError('offline');
-      throw new Error(result.error.message);
     }
     const rows = result.data ?? [];
     if (rows.length === 0) break;
@@ -83,10 +94,11 @@ export async function pullAll(
   client: LiftClient,
   userId: string,
   onProgress?: (t: SyncTable) => void,
+  authRetry: AuthRetry = passThrough,
 ): Promise<number> {
   let total = 0;
   for (const table of PULL_ORDER) {
-    total += await pullTable(client, table, userId);
+    total += await pullTable(client, table, userId, 500, authRetry);
     onProgress?.(table);
   }
   return total;

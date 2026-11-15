@@ -1,14 +1,15 @@
 import Dexie, { liveQuery, type Observable } from 'dexie';
 import { db, LOCAL_TABLE } from '../schema';
+import { reportStorageError } from '../../lib/storageEvents';
 import type { DeletableTable, OutboxEntry, SyncRecordMap, SyncTable } from '../../types/sync';
-
-const BACKOFF_BASE_MS = 2000;
-const BACKOFF_MAX_MS = 300000;
 
 export function runWrite<T>(tables: readonly SyncTable[], fn: () => Promise<T>): Promise<T> {
   const names = new Set<string>(tables.map((t) => LOCAL_TABLE[t]));
   names.add('syncQueue');
-  return db.transaction('rw', [...names], fn);
+  return db.transaction('rw', [...names], fn).catch((err: unknown) => {
+    reportStorageError(err);
+    throw err;
+  });
 }
 
 export function enqueue<T extends SyncTable>(
@@ -47,29 +48,42 @@ export async function enqueue(
 
 export async function listDue(now: number, force: boolean): Promise<OutboxEntry[]> {
   const pending = await db.syncQueue.where('state').equals('pending').sortBy('id');
-  if (force) return pending;
+  const keyOf = (e: OutboxEntry): string => `${e.table}:${e.recordId}`;
   const dueKeys = new Set(
-    pending.filter((e) => e.nextAttemptAt <= now).map((e) => `${e.table}:${e.recordId}`),
+    (force ? pending : pending.filter((e) => e.nextAttemptAt <= now)).map(keyOf),
   );
-  return pending.filter((e) => dueKeys.has(`${e.table}:${e.recordId}`));
+  if (dueKeys.size === 0) return [];
+  const failed = await db.syncQueue.where('state').equals('failed').toArray();
+  return [...pending, ...failed.filter((e) => dueKeys.has(keyOf(e)))]
+    .filter((e) => dueKeys.has(keyOf(e)))
+    .sort((x, y) => (x.id ?? 0) - (y.id ?? 0));
 }
 
 export async function removeEntries(ids: number[]): Promise<void> {
   await db.syncQueue.bulkDelete(ids);
 }
 
-export async function recordFailure(ids: number[], error: string, now: number): Promise<void> {
+export type FailureOutcome =
+  { kind: 'retryable'; nextAttemptAt: (attempts: number) => number } | { kind: 'permanent' };
+
+export async function recordFailure(
+  ids: number[],
+  error: string,
+  code: string | undefined,
+  outcome: FailureOutcome,
+): Promise<void> {
   await db.transaction('rw', db.syncQueue, async () => {
     for (const id of ids) {
       const entry = await db.syncQueue.get(id);
       if (!entry) continue;
       const attempts = entry.attempts + 1;
-      const delay = Math.min(BACKOFF_BASE_MS * 2 ** (attempts - 1), BACKOFF_MAX_MS);
-      await db.syncQueue.update(id, {
-        attempts,
-        lastError: error,
-        nextAttemptAt: now + delay,
-      });
+      const patch: Partial<OutboxEntry> = { attempts, lastError: error, lastErrorCode: code };
+      if (outcome.kind === 'permanent') {
+        patch.state = 'failed';
+      } else if (entry.state === 'pending') {
+        patch.nextAttemptAt = outcome.nextAttemptAt(attempts);
+      }
+      await db.syncQueue.update(id, patch);
     }
   });
 }
@@ -79,11 +93,132 @@ export async function hasPending(table: SyncTable, recordId: string): Promise<bo
   return count > 0;
 }
 
-export function observeOutboxCounts(): Observable<{ pending: number; failed: number }> {
-  return liveQuery(async () => ({
-    pending: await db.syncQueue.where('state').equals('pending').count(),
-    failed: await db.syncQueue.where('state').equals('failed').count(),
-  }));
+export function observeOutboxCounts(): Observable<{
+  pending: number;
+  failed: number;
+  oldestCreatedAt?: number;
+}> {
+  return liveQuery(async () => {
+    const oldest = await db.syncQueue.orderBy('id').first();
+    return {
+      pending: await db.syncQueue.where('state').equals('pending').count(),
+      failed: await db.syncQueue.where('state').equals('failed').count(),
+      ...(oldest ? { oldestCreatedAt: oldest.createdAt } : {}),
+    };
+  });
+}
+
+export async function nextDueAt(): Promise<number | undefined> {
+  const first = await db.syncQueue.where('state').equals('pending').sortBy('nextAttemptAt');
+  return first[0]?.nextAttemptAt;
+}
+
+export interface FailedChange {
+  table: SyncTable;
+  recordId: string;
+  op: 'upsert' | 'delete';
+  entryIds: number[];
+  attempts: number;
+  lastError: string;
+  firstCreatedAt: number;
+  recordName?: string;
+  recordDate?: number | string;
+}
+
+interface Label {
+  recordName?: string;
+  recordDate?: number | string;
+}
+
+function labelOf(table: SyncTable, rec: SyncRecordMap[SyncTable] | undefined): Label {
+  if (!rec) return {};
+  switch (table) {
+    case 'workouts': {
+      const w = rec as SyncRecordMap['workouts'];
+      return { recordName: w.name, recordDate: w.startedAt };
+    }
+    case 'bodyweight_entries':
+      return { recordDate: (rec as SyncRecordMap['bodyweight_entries']).date };
+    case 'exercises':
+    case 'templates':
+      return { recordName: (rec as SyncRecordMap['exercises' | 'templates']).name };
+    case 'user_settings':
+      return {};
+  }
+}
+
+async function localRecord(
+  table: SyncTable,
+  recordId: string,
+): Promise<SyncRecordMap[SyncTable] | undefined> {
+  switch (table) {
+    case 'workouts':
+      return db.workouts.get(recordId);
+    case 'exercises':
+      return db.exercises.get(recordId);
+    case 'templates':
+      return db.templates.get(recordId);
+    case 'bodyweight_entries':
+      return db.bodyweight.get(recordId);
+    case 'user_settings':
+      return undefined;
+  }
+}
+
+export async function listFailedChanges(): Promise<FailedChange[]> {
+  const failed = (await db.syncQueue.where('state').equals('failed').sortBy('id')).filter(
+    (e): e is OutboxEntry & { id: number } => e.id !== undefined,
+  );
+  const groups = new Map<string, (OutboxEntry & { id: number })[]>();
+  for (const entry of failed) {
+    const key = `${entry.table}:${entry.recordId}`;
+    groups.set(key, [...(groups.get(key) ?? []), entry]);
+  }
+  const out: FailedChange[] = [];
+  for (const list of groups.values()) {
+    const last = list[list.length - 1];
+    const first = list[0];
+    if (!last || !first) continue;
+    const local = await localRecord(last.table, last.recordId);
+    const label = labelOf(last.table, local ?? (last.op === 'upsert' ? last.payload : undefined));
+    out.push({
+      table: last.table,
+      recordId: last.recordId,
+      op: last.op,
+      entryIds: list.map((e) => e.id),
+      attempts: Math.max(...list.map((e) => e.attempts)),
+      lastError: last.lastError ?? 'Unknown sync error',
+      firstCreatedAt: first.createdAt,
+      ...label,
+    });
+  }
+  return out;
+}
+
+export async function retryFailed(table?: SyncTable, recordId?: string): Promise<number> {
+  const now = Date.now();
+  return db.transaction('rw', db.syncQueue, async () => {
+    const failed = await db.syncQueue.where('state').equals('failed').toArray();
+    const ids = failed
+      .filter(
+        (e) =>
+          (table === undefined || e.table === table) &&
+          (recordId === undefined || e.recordId === recordId),
+      )
+      .flatMap((e) => (e.id === undefined ? [] : [e.id]));
+    await db.syncQueue.bulkUpdate(
+      ids.map((key) => ({ key, changes: { state: 'pending' as const, nextAttemptAt: now } })),
+    );
+    return ids.length;
+  });
+}
+
+export async function countOutboxByState(): Promise<{ pending: number; failed: number }> {
+  const [pending, failed] = await Promise.all([
+    db.syncQueue.where('state').equals('pending').count(),
+    db.syncQueue.where('state').equals('failed').count(),
+  ]);
+  return { pending, failed };
 }
 
 export async function countOutbox(): Promise<number> {

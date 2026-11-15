@@ -307,7 +307,11 @@ describe('push through fakeClient', () => {
     if (!res.ok) throw new Error('expected ok');
     await markTemplateUsedInTx('tt', 1_700_000_000_000);
     const server = new FakeServer();
-    const out = await pushOutbox(createFakeClient(server), { now: Date.now(), force: true });
+    const out = await pushOutbox(createFakeClient(server), {
+      now: Date.now(),
+      force: true,
+      authRetry: (fn) => fn(),
+    });
     expect(out.failed).toBe(0);
     const rows = server.tables.templates;
     expect(rows).toHaveLength(1);

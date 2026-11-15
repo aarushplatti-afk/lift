@@ -32,6 +32,11 @@ function del(id: number, recordId: string): OutboxEntry {
 }
 
 describe('coalesce', () => {
+  it('carries the maximum attempts over the entries of an op', () => {
+    const ops = coalesce([{ ...up(1, 'a'), attempts: 3, state: 'failed' }, up(2, 'a')]);
+    expect(ops[0]?.attempts).toBe(3);
+  });
+
   it('latest upsert per record wins and keeps every entry id', () => {
     const ops = coalesce([up(1, 'a', 'one'), up(2, 'a', 'two')]);
     expect(ops).toHaveLength(1);
@@ -73,8 +78,17 @@ describe('batchRuns', () => {
           payload: exerciseRecord(`r${n}`),
           entryIds: [n],
           seq: n,
+          attempts: 0,
         }
-      : { table, recordId: `r${n}`, op: 'delete', payload: null, entryIds: [n], seq: n };
+      : {
+          table,
+          recordId: `r${n}`,
+          op: 'delete',
+          payload: null,
+          entryIds: [n],
+          seq: n,
+          attempts: 0,
+        };
 
   it('batches only consecutive ops with the same table and op', () => {
     const runs = batchRuns([

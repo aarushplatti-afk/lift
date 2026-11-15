@@ -11,9 +11,10 @@ const auth = {
   onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
 };
 const syncNow = vi.fn(() => Promise.resolve());
+const cancelRetry = vi.fn();
 
 vi.mock('../../lib/supabase', () => ({ getSupabase: () => ({ auth }) }));
-vi.mock('../engine', () => ({ getSyncEngine: () => ({ syncNow }) }));
+vi.mock('../engine', () => ({ getSyncEngine: () => ({ syncNow, cancelRetry }) }));
 
 const { getCachedSession, signIn, signOut, signUp } = await import('../auth');
 
@@ -123,9 +124,11 @@ describe('signOut', () => {
     await meta.setOwner('u1', 'a@b.c');
     await runWrite(['exercises'], () => enqueue('exercises', 'e1', 'delete'));
     const blocked = await signOut({ discardUnsynced: false });
-    expect(blocked).toEqual({ ok: false, reason: 'unsynced', pendingCount: 1 });
+    expect(blocked).toEqual({ ok: false, reason: 'unsynced', pendingCount: 1, failedCount: 0 });
     expect(auth.signOut).not.toHaveBeenCalled();
+    expect(cancelRetry).not.toHaveBeenCalled();
     expect(await signOut({ discardUnsynced: true })).toEqual({ ok: true });
+    expect(cancelRetry).toHaveBeenCalledTimes(1);
     expect(auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
     expect(await db.syncQueue.count()).toBe(0);
   });

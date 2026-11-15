@@ -20,6 +20,7 @@ export type OutboxEntry = {
   createdAt: number;
   attempts: number;
   lastError?: string;
+  lastErrorCode?: string;
   state: 'pending' | 'failed';
   nextAttemptAt: number;
 } & ({ op: 'upsert'; payload: SyncRecordMap[SyncTable] } | { op: 'delete'; payload: null });
@@ -37,4 +38,5 @@ export interface SyncStatus {
   failedCount: number;
   lastSyncedAt?: number;
   lastError?: string;
+  oldestPendingAt?: number;
 }

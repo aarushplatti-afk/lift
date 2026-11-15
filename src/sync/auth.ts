@@ -1,5 +1,5 @@
 import { getOwner, setOwner, wipeLocalData } from '../db/repos/meta';
-import { countOutbox } from '../db/repos/outbox';
+import { countOutboxByState } from '../db/repos/outbox';
 import { getSupabase } from '../lib/supabase';
 import { getSyncEngine } from './engine';
 import { AUTH_TIMEOUT_MS, TIMED_OUT, withTimeout } from './timeout';
@@ -10,7 +10,8 @@ export interface AuthIdentity {
 }
 
 export type SignInResult = { ok: true } | { ok: false; message: string };
-export type SignOutResult = { ok: true } | { ok: false; reason: 'unsynced'; pendingCount: number };
+export type SignOutResult =
+  { ok: true } | { ok: false; reason: 'unsynced'; pendingCount: number; failedCount: number };
 
 const STORAGE_KEY = 'lift-auth';
 const listeners = new Set<(id: AuthIdentity | null) => void>();
@@ -161,10 +162,12 @@ export async function signOut(opts: { discardUnsynced: boolean }): Promise<SignO
       // A failed sync leaves entries pending, which the check below reports.
     }
   }
-  const pendingCount = await countOutbox();
+  const counts = await countOutboxByState();
+  const pendingCount = counts.pending + counts.failed;
   if (pendingCount > 0 && !opts.discardUnsynced) {
-    return { ok: false, reason: 'unsynced', pendingCount };
+    return { ok: false, reason: 'unsynced', pendingCount, failedCount: counts.failed };
   }
+  getSyncEngine().cancelRetry();
   const { error } = await getSupabase().auth.signOut({ scope: 'local' });
   if (error) console.error('Supabase signOut failed; clearing local data anyway', error.message);
   await withSyncLock(wipeLocalData);

@@ -7,6 +7,13 @@ export type Row = Record<string, unknown> & { updated_at: string; user_id: strin
 interface Result {
   data: Row[] | null;
   error: { message: string; code?: string } | null;
+  status?: number;
+}
+
+export interface FailSpec {
+  message: string;
+  code?: string;
+  status?: number;
 }
 
 const KEYSET = /^updated_at\.gt\."([^"]*)",and\(updated_at\.eq\."([^"]*)",(\w+)\.gt\."([^"]*)"\)$/;
@@ -21,13 +28,19 @@ export class FakeServer {
   };
   clock = '2026-01-01T00:00:00.000000+00:00';
   networkDown = false;
-  failWhen: ((table: SyncTable, rows: Row[]) => string | null) | undefined;
+  failWhen: ((table: SyncTable, rows: Row[]) => string | FailSpec | null) | undefined;
+  failUpdate: FailSpec | undefined;
   upsertCalls: { table: SyncTable; rows: Row[]; onConflict: string }[] = [];
   updateCalls: { table: SyncTable; values: Record<string, unknown>; ids: string[] }[] = [];
+  bulkCalls: { table: SyncTable; userId: string }[] = [];
+  failBulkWhen: ((table: SyncTable) => boolean) | undefined;
   selectCalls: { table: SyncTable; filter: string | undefined }[] = [];
   session: { user: { id: string } } | null = { user: { id: 'u1' } };
   onUpsert: (() => Promise<void>) | undefined;
   enforceExerciseNameUnique = false;
+  tokenValid = true;
+  refreshMode: 'ok' | 'rejected' | 'network' = 'ok';
+  refreshCalls = 0;
 
   keyOf(table: SyncTable): 'id' | 'user_id' {
     return table === 'user_settings' ? 'user_id' : 'id';
@@ -38,9 +51,29 @@ export class FakeServer {
   }
 
   private fail(): Result | undefined {
-    return this.networkDown
-      ? { data: null, error: { message: 'TypeError: Failed to fetch' } }
-      : undefined;
+    if (this.networkDown) {
+      return { data: null, error: { message: 'TypeError: Failed to fetch' } };
+    }
+    if (!this.tokenValid) {
+      return { data: null, error: { message: 'JWT expired', code: 'PGRST301' }, status: 401 };
+    }
+    return undefined;
+  }
+
+  refresh(): {
+    data: { session: object | null };
+    error: { message: string; status?: number } | null;
+  } {
+    this.refreshCalls += 1;
+    if (this.refreshMode === 'network') throw new TypeError('Failed to fetch');
+    if (this.refreshMode === 'rejected') {
+      return {
+        data: { session: null },
+        error: { message: 'Invalid Refresh Token: Already Used', status: 400 },
+      };
+    }
+    this.tokenValid = true;
+    return { data: { session: { user: { id: 'u1' } } }, error: null };
   }
 
   private nameConflicts(row: Row): boolean {
@@ -60,8 +93,15 @@ export class FakeServer {
     this.upsertCalls.push({ table, rows, onConflict });
     const down = this.fail();
     if (down) return down;
-    const message = this.failWhen?.(table, rows);
-    if (message) return { data: null, error: { message } };
+    const spec = this.failWhen?.(table, rows);
+    if (spec) {
+      const { message, code, status } = typeof spec === 'string' ? { message: spec } : spec;
+      return {
+        data: null,
+        error: code ? { message, code } : { message },
+        ...(status === undefined ? {} : { status }),
+      };
+    }
     if (
       table === 'exercises' &&
       this.enforceExerciseNameUnique &&
@@ -88,8 +128,31 @@ export class FakeServer {
     this.updateCalls.push({ table, values, ids });
     const down = this.fail();
     if (down) return down;
+    if (this.failUpdate) {
+      const { message, code, status } = this.failUpdate;
+      return {
+        data: null,
+        error: code ? { message, code } : { message },
+        ...(status === undefined ? {} : { status }),
+      };
+    }
     for (const row of this.tables[table]) {
       if (ids.includes(String(row.id))) Object.assign(row, values, { updated_at: this.clock });
+    }
+    return { data: null, error: null };
+  }
+
+  bulkTombstone(table: SyncTable, userId: string, values: Record<string, unknown>): Result {
+    this.bulkCalls.push({ table, userId });
+    const down = this.fail();
+    if (down) return down;
+    if (this.failBulkWhen?.(table)) {
+      return { data: null, error: { message: 'boom', code: 'XX000' }, status: 500 };
+    }
+    for (const row of this.tables[table]) {
+      if (row.user_id === userId && (row.deleted_at ?? null) === null) {
+        Object.assign(row, values, { updated_at: this.clock });
+      }
     }
     return { data: null, error: null };
   }
@@ -163,13 +226,16 @@ export function createFakeClient(server: FakeServer): LiftClient {
   const client = {
     from(table: SyncTable) {
       return {
-        async upsert(rows: Row[], opts: { onConflict: string }) {
+        async upsert(input: Row | Row[], opts: { onConflict: string }) {
           if (server.onUpsert) await server.onUpsert();
-          return server.upsert(table, rows, opts.onConflict);
+          return server.upsert(table, Array.isArray(input) ? input : [input], opts.onConflict);
         },
         update(values: Record<string, unknown>) {
           return {
             in: (_col: string, ids: string[]) => Promise.resolve(server.update(table, values, ids)),
+            eq: (_col: string, userId: string) => ({
+              is: () => Promise.resolve(server.bulkTombstone(table, userId, values)),
+            }),
           };
         },
         select: () => new Query(server, table),
@@ -177,6 +243,7 @@ export function createFakeClient(server: FakeServer): LiftClient {
     },
     auth: {
       getSession: () => Promise.resolve({ data: { session: server.session }, error: null }),
+      refreshSession: async () => server.refresh(),
     },
   };
   return client as unknown as LiftClient;

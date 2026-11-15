@@ -1,10 +1,13 @@
 import { listDue, recordFailure, removeEntries } from '../db/repos/outbox';
 import type { LiftClient } from '../lib/supabase';
+import { AuthExpiredError } from './authRetry';
 import { batchRuns, coalesce, type PushOp } from './coalesce';
 import { toRow } from './mappers';
+import { classifyError, describeSyncError, nextDelay, SyncRequestError } from './retry';
 
 interface WriteResult {
-  error: { message: string } | null;
+  error: { message: string; code?: string } | null;
+  status?: number;
 }
 
 interface LooseTable {
@@ -46,56 +49,89 @@ async function sendRun(client: LiftClient, run: PushOp[], now: number): Promise<
   }
   if (result.error) {
     if (isNetworkError(result.error.message)) throw new OfflineError('offline');
-    throw new Error(result.error.message);
+    throw new SyncRequestError(result.error.message, result.status, result.error.code);
   }
 }
 
-function describe(err: unknown): string {
-  return err instanceof Error ? err.message : 'Unknown sync error';
+function entryIdsOf(run: PushOp[]): number[] {
+  return run.flatMap((o) => o.entryIds);
+}
+
+function maxAttempts(run: PushOp[]): number {
+  return Math.max(0, ...run.map((o) => o.attempts));
 }
 
 export async function pushOutbox(
   client: LiftClient,
-  opts: { now: number; force: boolean },
-): Promise<{ pushed: number; failed: number; offline: boolean }> {
+  opts: {
+    now: number;
+    force: boolean;
+    authRetry: <T>(fn: () => Promise<T>) => Promise<T>;
+  },
+): Promise<{ pushed: number; failed: number; offline: boolean; authExpired: boolean }> {
   const entries = await listDue(opts.now, opts.force);
   const runs = batchRuns(coalesce(entries));
   let pushed = 0;
   let failed = 0;
+
+  const send = (run: PushOp[]): Promise<void> =>
+    opts.authRetry(() => sendRun(client, run, opts.now));
+
+  async function fail(run: PushOp[], err: unknown): Promise<'retryable' | 'permanent'> {
+    const kind = classifyError(err, maxAttempts(run));
+    const code = err instanceof SyncRequestError ? err.code : undefined;
+    await recordFailure(
+      entryIdsOf(run),
+      describeSyncError(err),
+      code,
+      kind === 'retryable'
+        ? { kind, nextAttemptAt: (attempts) => opts.now + nextDelay(attempts) }
+        : { kind },
+    );
+    failed += run.length;
+    return kind;
+  }
+
   try {
-    for (const run of runs) {
+    runLoop: for (const run of runs) {
       try {
-        await sendRun(client, run, opts.now);
-        await removeEntries(run.flatMap((o) => o.entryIds));
+        await send(run);
+        await removeEntries(entryIdsOf(run));
         pushed += run.length;
         continue;
       } catch (err) {
-        if (err instanceof OfflineError) throw err;
+        if (isStop(err)) throw err;
         if (run.length === 1) {
-          await recordFailure(
-            run.flatMap((o) => o.entryIds),
-            describe(err),
-            opts.now,
-          );
-          failed += 1;
+          if ((await fail(run, err)) === 'retryable') break runLoop;
           continue;
+        }
+        const duplicate = err instanceof SyncRequestError && err.code === '23505';
+        if (!duplicate && classifyError(err, maxAttempts(run)) === 'retryable') {
+          await fail(run, err);
+          break runLoop;
         }
       }
       for (const op of run) {
         try {
-          await sendRun(client, [op], opts.now);
+          await send([op]);
           await removeEntries(op.entryIds);
           pushed += 1;
         } catch (err) {
-          if (err instanceof OfflineError) throw err;
-          await recordFailure(op.entryIds, describe(err), opts.now);
-          failed += 1;
+          if (isStop(err)) throw err;
+          if ((await fail([op], err)) === 'retryable') break runLoop;
         }
       }
     }
   } catch (err) {
-    if (err instanceof OfflineError) return { pushed, failed, offline: true };
+    if (err instanceof OfflineError) return { pushed, failed, offline: true, authExpired: false };
+    if (err instanceof AuthExpiredError) {
+      return { pushed, failed, offline: false, authExpired: true };
+    }
     throw err;
   }
-  return { pushed, failed, offline: false };
+  return { pushed, failed, offline: false, authExpired: false };
+}
+
+function isStop(err: unknown): boolean {
+  return err instanceof OfflineError || err instanceof AuthExpiredError;
 }

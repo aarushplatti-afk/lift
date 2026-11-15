@@ -11,6 +11,7 @@ import {
 } from '../db/repos/workouts';
 import { canCompleteSet, type CompleteResult } from '../lib/calc/validation';
 import { newId } from '../lib/ids';
+import { requestPersistentStorage } from '../lib/platform/storage';
 import * as ops from '../lib/workoutOps';
 import type { SetPatch, WorkoutInit } from '../lib/workoutOps';
 import { useToastStore } from '../components/ui/toastStore';
@@ -138,6 +139,15 @@ function rearmPersistence(): void {
   scheduleEnqueue();
 }
 
+async function ensurePersistence(): Promise<void> {
+  try {
+    if (typeof navigator === 'undefined' || !navigator.storage?.persisted) return;
+    if (!(await navigator.storage.persisted())) await requestPersistentStorage();
+  } catch {
+    return;
+  }
+}
+
 export const useActiveWorkoutStore = create<ActiveWorkoutState>((set, get) => {
   function mutate(fn: (w: Workout, c: ops.OpsCtx) => Workout): void {
     const w = get().workout;
@@ -241,8 +251,10 @@ export const useActiveWorkoutStore = create<ActiveWorkoutState>((set, get) => {
         rearmPersistence();
         throw error;
       }
-      if (outcome.status === 'finished') set({ workout: null });
-      else rearmPersistence();
+      if (outcome.status === 'finished') {
+        set({ workout: null });
+        void ensurePersistence();
+      } else rearmPersistence();
       return outcome;
     },
 

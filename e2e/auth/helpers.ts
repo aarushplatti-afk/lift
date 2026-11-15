@@ -1,5 +1,6 @@
+import { readFile } from 'node:fs/promises';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 export const SUPABASE_URL = process.env.SUPABASE_TEST_URL;
 export const SUPABASE_KEY = process.env.SUPABASE_TEST_KEY;
@@ -259,4 +260,126 @@ export async function insertRemoteWorkouts(
     const { error } = await client.from('workouts').insert(batch);
     if (error) throw new Error(`workouts insert failed: ${error.message}`);
   }
+}
+
+export const POLL = { timeout: 20_000, intervals: [500, 1000] };
+
+export function mainNav(page: Page, name: string): Locator {
+  return page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name });
+}
+
+/** Logs and finishes a one-set Barbell Bench Press workout through the UI (weight in the current unit). */
+export async function logBenchWorkout(page: Page, weight: number, unit = 'lb'): Promise<void> {
+  await page.getByRole('button', { name: 'Start Empty Workout' }).click();
+  await page.getByRole('button', { name: '+ Add Exercise' }).click();
+  await page.getByText('Barbell Bench Press', { exact: true }).click();
+  await page.getByRole('button', { name: /^Add \(1\)$/ }).click();
+  await expect(page.getByRole('region', { name: 'Barbell Bench Press' })).toBeVisible();
+  await page.getByLabel(`Weight (${unit}) set 1`).fill(String(weight));
+  await page.getByLabel('Reps set 1').fill('5');
+  await page.getByRole('button', { name: 'Complete set 1' }).click();
+  await page.getByRole('button', { name: 'Finish', exact: true }).click();
+  await expect(page.getByText('Personal records')).toBeVisible();
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Start Empty Workout' })).toBeVisible();
+}
+
+/** Logs a weigh-in for today on the Progress > Bodyweight screen. */
+export async function logWeighIn(page: Page, value: string, unit = 'lb'): Promise<void> {
+  await mainNav(page, 'Progress').click();
+  await page.getByRole('radio', { name: 'Bodyweight', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Log weight' })).toBeVisible();
+  await page.getByRole('textbox', { name: `Weight in ${unit}` }).fill(value);
+  await page.getByRole('button', { name: /^(Save|Update)$/ }).click();
+  await expect(page.getByText('Weigh-in saved')).toBeVisible();
+}
+
+/** Creates a template with one exercise from the Workout tab. */
+export async function createTemplate(page: Page, name: string, exercise: string): Promise<void> {
+  await mainNav(page, 'Workout').click();
+  await page.getByRole('button', { name: '+ New Template' }).click();
+  await page.getByLabel('Template name').fill(name);
+  await page.getByRole('button', { name: '+ Add Exercise' }).click();
+  await page.getByText(exercise, { exact: true }).click();
+  await page.getByRole('button', { name: /^Add \(1\)$/ }).click();
+  await expect(page.getByRole('region', { name: exercise })).toBeVisible();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByRole('button', { name, exact: true })).toBeVisible();
+}
+
+/** Opens Settings, presses Sync now, waits for it to finish, and returns to the Workout tab. */
+export async function syncNowUi(page: Page): Promise<void> {
+  await mainNav(page, 'Workout').click();
+  await openSettings(page);
+  await page.getByRole('button', { name: 'Sync now' }).click();
+  await expect(page.getByRole('button', { name: 'Sync now' })).toBeEnabled({ timeout: 20_000 });
+  await page.waitForTimeout(1000);
+  await page.getByRole('button', { name: 'Back' }).click();
+}
+
+export interface DataSnapshot {
+  exercises: Record<string, unknown>[];
+  workouts: Record<string, unknown>[];
+  templates: Record<string, unknown>[];
+  bodyweight: Record<string, unknown>[];
+  settings: unknown;
+}
+
+function stripVolatile(rows: unknown[] | undefined): Record<string, unknown>[] {
+  return (rows ?? [])
+    .map((r) => {
+      const copy = { ...(r as Record<string, unknown>) };
+      delete copy.updatedAt;
+      return copy;
+    })
+    .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+}
+
+/** Local data from Dexie with updatedAt removed and rows sorted by id, for deep-equal comparison. */
+export async function snapshotData(page: Page): Promise<DataSnapshot> {
+  const dump = await dumpDexie(page);
+  return {
+    exercises: stripVolatile(dump.exercises),
+    workouts: stripVolatile(dump.workouts),
+    templates: stripVolatile(dump.templates),
+    bodyweight: stripVolatile(dump.bodyweight),
+    settings: stripVolatile(dump.settings)[0],
+  };
+}
+
+/** Clicks Export data and returns the downloaded file's name and text. */
+export async function exportBackupUi(
+  page: Page,
+  savePath: string,
+): Promise<{ fileName: string; text: string }> {
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: 'Export data' }).click(),
+  ]);
+  await download.saveAs(savePath);
+  return { fileName: download.suggestedFilename(), text: await readFile(savePath, 'utf8') };
+}
+
+/** Picks a backup file, confirms the summary sheet and the Replace dialog. */
+export async function importBackupUi(page: Page, filePath: string): Promise<void> {
+  await page.getByLabel('Backup file').setInputFiles(filePath);
+  await expect(page.getByRole('dialog', { name: 'Import backup' })).toBeVisible();
+  await page.getByRole('button', { name: 'Replace all data' }).click();
+  const confirm = page.getByRole('dialog', { name: 'Replace all data?' });
+  await expect(confirm).toBeVisible();
+  await confirm.getByRole('button', { name: 'Replace all data' }).click();
+  await expect(page.getByText(/Backup imported|couldn't sync yet/)).toBeVisible({
+    timeout: 30_000,
+  });
+}
+
+/** Runs the two-step Delete all data dialog. */
+export async function deleteAllUi(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Delete all data' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  const final = page.getByRole('button', { name: 'Delete everything' });
+  await expect(final).toBeDisabled();
+  await page.getByLabel('Type DELETE to confirm').fill('DELETE');
+  await final.click();
+  await expect(page.getByText('All data deleted')).toBeVisible({ timeout: 30_000 });
 }

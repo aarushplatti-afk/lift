@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { HashRouter, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthGate, ConfigError } from './components/AuthGate';
+import { QuotaDialog } from './components/QuotaDialog';
 import { UpdateToast } from './components/UpdateToast';
 import { ChunkErrorBoundary } from './components/ui/ChunkErrorBoundary';
 import { TabBar } from './components/ui/TabBar';
@@ -120,6 +121,7 @@ export default function App() {
       {isSupabaseConfigured() ? <ConfiguredApp /> : <ConfigError />}
       <ToastHost />
       <UpdateToast />
+      <QuotaDialog />
     </>
   );
 }
