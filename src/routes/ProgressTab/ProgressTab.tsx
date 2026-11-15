@@ -5,6 +5,7 @@ import { Header } from '../../components/ui/Header';
 import { SegmentedControl } from '../../components/ui/SegmentedControl';
 import { useProgressViewStore } from '../../store/progressView';
 import type { ProgressView } from '../../store/progressView';
+import { BodyweightView } from './Bodyweight/BodyweightView';
 import { ExercisesView } from './ExercisesView';
 
 const VIEWS: readonly { value: ProgressView; label: string }[] = [
@@ -39,12 +40,7 @@ export function ProgressTab() {
           onChange={setView}
         />
         {view === 'exercises' ? <ExercisesView /> : null}
-        {view === 'bodyweight' ? (
-          <EmptyState
-            title="Bodyweight tracking"
-            description="Logging your weight arrives in the next update."
-          />
-        ) : null}
+        {view === 'bodyweight' ? <BodyweightView /> : null}
         {view === 'prs' ? (
           <EmptyState
             title="Personal records"

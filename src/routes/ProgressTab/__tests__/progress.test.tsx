@@ -115,11 +115,12 @@ beforeEach(async () => {
     exerciseId: undefined,
     metric: undefined,
     range: '3M',
+    bodyweightRange: '3M',
   });
 });
 
 describe('Progress tab shell', () => {
-  it('shows the three segments with placeholders for Bodyweight and PRs', async () => {
+  it('shows the three segments with the Bodyweight view and a PRs placeholder', async () => {
     renderTab();
     const group = screen.getByRole('radiogroup', { name: 'Progress views' });
     expect(
@@ -128,8 +129,8 @@ describe('Progress tab shell', () => {
         .map((r) => r.textContent),
     ).toEqual(['Exercises', 'Bodyweight', 'PRs']);
     await userEvent.click(screen.getByRole('radio', { name: 'Bodyweight' }));
-    expect(screen.getByText('Bodyweight tracking')).toBeInTheDocument();
-    expect(screen.getByText('Logging your weight arrives in the next update.')).toBeInTheDocument();
+    expect(await screen.findByText('No weigh-ins yet')).toBeInTheDocument();
+    expect(screen.getByText('Log your first weigh-in to start tracking.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('radio', { name: 'PRs' }));
     expect(screen.getByText('Personal records')).toBeInTheDocument();
     expect(screen.getByText(/A full records list is coming soon/)).toBeInTheDocument();
