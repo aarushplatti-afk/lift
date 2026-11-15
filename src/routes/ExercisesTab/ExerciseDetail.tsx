@@ -12,9 +12,16 @@ import {
   isExerciseUsed,
   restoreExercise,
 } from '../../db/repos/exercises';
+import { TrophyIcon } from '../../components/workout/TrophyIcon';
+import { listCompletedWorkouts } from '../../db/repos/workouts';
 import { useLiveQuery } from '../../hooks/useLiveQuery';
+import { useNow } from '../../hooks/useNow';
+import { exerciseHistory } from '../../lib/calc/history';
+import { setBadgeLabels } from '../../lib/calc/previous';
 import { EQUIPMENT, EXERCISE_TYPES, MUSCLE_GROUPS } from '../../lib/exercises';
-import type { Exercise } from '../../types/domain';
+import { formatPreviousSet, formatWorkoutDate } from '../../lib/format';
+import { useSettingsStore } from '../../store/settings';
+import type { Exercise, Workout } from '../../types/domain';
 import { BackLink } from './BackLink';
 
 type DetailTab = 'history' | 'records' | 'chart';
@@ -25,8 +32,10 @@ const TAB_OPTIONS: readonly { value: DetailTab; label: string }[] = [
   { value: 'chart', label: 'Chart' },
 ];
 
-const TAB_PLACEHOLDER: Record<DetailTab, { title: string; description: string }> = {
-  history: { title: 'No history yet', description: 'Logged sets will appear here.' },
+const TAB_PLACEHOLDER: Record<
+  Exclude<DetailTab, 'history'>,
+  { title: string; description: string }
+> = {
   records: { title: 'No records yet', description: 'Personal records will appear here.' },
   chart: { title: 'No data to chart', description: 'Progress charts will appear here.' },
 };
@@ -42,6 +51,56 @@ function ArchiveMessage({ name, builtIn }: { name: string; builtIn: boolean }) {
       “{name}” {reason}, so it can’t be deleted. Archiving hides it from the library and picker.
       Your history is kept, and you can restore it with Show archived.
     </p>
+  );
+}
+
+function PrIcon({ size }: { size?: number }) {
+  return (
+    <span role="img" aria-label="Personal record">
+      <TrophyIcon size={size} />
+    </span>
+  );
+}
+
+function HistoryPanel({ exercise }: { exercise: Exercise }) {
+  const unit = useSettingsStore((s) => s.settings.unit);
+  const now = useNow(60000);
+  const workouts = useLiveQuery<Workout[] | null>(() => listCompletedWorkouts(), [], null);
+  if (workouts === null) return null;
+  const sessions = exerciseHistory(exercise.id, workouts);
+  if (sessions.length === 0) {
+    return <EmptyState title="No history yet" description="Logged sets will appear here." />;
+  }
+  return (
+    <ul className="flex flex-col gap-3">
+      {sessions.map((session) => {
+        const badges = setBadgeLabels(session.sets);
+        return (
+          <li key={session.workoutId}>
+            <Link
+              to={`/history/${session.workoutId}`}
+              className="block min-h-tap rounded-card border border-border bg-surface p-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            >
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-body font-semibold">
+                  {formatWorkoutDate(session.startedAt, now)} · {session.workoutName}
+                </p>
+                {session.hasPR && <PrIcon />}
+              </div>
+              <ul className="flex flex-col gap-1">
+                {session.sets.map((set, i) => (
+                  <li key={set.id} className="flex items-center gap-3 text-body-sm tabular-nums">
+                    <span className="w-6 font-semibold text-secondary">{badges[i]}</span>
+                    <span>{formatPreviousSet(set, exercise.type, unit)}</span>
+                    {set.isPR === true && <PrIcon size={16} />}
+                  </li>
+                ))}
+              </ul>
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -100,8 +159,6 @@ function Detail({ exercise, used }: { exercise: Exercise; used: boolean }) {
     }
   };
 
-  const placeholder = TAB_PLACEHOLDER[tab];
-
   return (
     <>
       <Header
@@ -152,7 +209,14 @@ function Detail({ exercise, used }: { exercise: Exercise; used: boolean }) {
           value={tab}
           onChange={setTab}
         />
-        <EmptyState title={placeholder.title} description={placeholder.description} />
+        {tab === 'history' ? (
+          <HistoryPanel exercise={exercise} />
+        ) : (
+          <EmptyState
+            title={TAB_PLACEHOLDER[tab].title}
+            description={TAB_PLACEHOLDER[tab].description}
+          />
+        )}
 
         {showAction && (
           <Button

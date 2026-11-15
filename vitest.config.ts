@@ -2,6 +2,8 @@ import path from 'node:path';
 import { defineConfig, mergeConfig } from 'vitest/config';
 import viteConfig from './vite.config';
 
+process.env.TZ = 'America/New_York';
+
 export default mergeConfig(
   viteConfig,
   defineConfig({

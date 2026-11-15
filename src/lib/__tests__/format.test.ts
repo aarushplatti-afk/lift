@@ -4,7 +4,11 @@ import {
   formatElapsed,
   formatLastUsed,
   formatPreviousSet,
+  formatSetDetail,
+  formatVolume,
   formatWeight,
+  formatWorkoutDate,
+  formatWorkoutDateTime,
 } from '../format';
 import { lbToKg } from '../units';
 import type { WorkoutSet } from '../../types/domain';
@@ -131,5 +135,68 @@ describe('formatLastUsed', () => {
   it('crosses a year boundary by calendar day', () => {
     expect(formatLastUsed(at(2025, 12, 31, 23), at(2026, 1, 1, 1))).toBe('Used yesterday');
     expect(formatLastUsed(at(2025, 12, 30), at(2026, 1, 2))).toBe('Used 3 days ago');
+  });
+});
+
+describe('formatWorkoutDate', () => {
+  const nov12 = new Date(2026, 10, 12, 18, 5).getTime();
+  it('formats weekday, month and day', () => {
+    expect(formatWorkoutDate(nov12)).toBe('Thu, Nov 12');
+  });
+  it('adds the year only when now is given and the year differs', () => {
+    expect(formatWorkoutDate(nov12, new Date(2026, 11, 1).getTime())).toBe('Thu, Nov 12');
+    expect(formatWorkoutDate(nov12, new Date(2027, 0, 1).getTime())).toBe('Thu, Nov 12, 2026');
+  });
+});
+
+describe('formatWorkoutDateTime', () => {
+  it('formats date and 12-hour time', () => {
+    expect(formatWorkoutDateTime(new Date(2026, 10, 12, 18, 5).getTime())).toBe(
+      'Thu, Nov 12, 2026 · 6:05 PM',
+    );
+    expect(formatWorkoutDateTime(new Date(2026, 10, 12, 0, 7).getTime())).toBe(
+      'Thu, Nov 12, 2026 · 12:07 AM',
+    );
+  });
+});
+
+describe('formatVolume', () => {
+  it('rounds and groups in lb', () => {
+    expect(formatVolume(lbToKg(12345.6), 'lb')).toBe('12,346 lb');
+  });
+  it('rounds and groups in kg', () => {
+    expect(formatVolume(1234.4, 'kg')).toBe('1,234 kg');
+    expect(formatVolume(0, 'kg')).toBe('0 kg');
+  });
+});
+
+describe('formatSetDetail', () => {
+  const set = (over: Partial<WorkoutSet>): WorkoutSet => ({
+    id: 's',
+    order: 0,
+    type: 'normal',
+    completed: true,
+    ...over,
+  });
+  it('formats weight_reps', () => {
+    expect(formatSetDetail(set({ weightKg: 100, reps: 5 }), 'weight_reps', 'kg')).toBe(
+      '100 kg × 5',
+    );
+    expect(formatSetDetail(set({ weightKg: lbToKg(135), reps: 8 }), 'weight_reps', 'lb')).toBe(
+      '135 lb × 8',
+    );
+  });
+  it('formats bodyweight_reps', () => {
+    expect(formatSetDetail(set({ reps: 12 }), 'bodyweight_reps', 'kg')).toBe('12 reps');
+    expect(formatSetDetail(set({}), 'bodyweight_reps', 'kg')).toBe('0 reps');
+  });
+  it('formats weighted_bodyweight with a plus', () => {
+    expect(formatSetDetail(set({ weightKg: 10, reps: 6 }), 'weighted_bodyweight', 'kg')).toBe(
+      '+10 kg × 6',
+    );
+  });
+  it('formats duration', () => {
+    expect(formatSetDetail(set({ durationSec: 75 }), 'duration', 'kg')).toBe('1:15');
+    expect(formatSetDetail(set({}), 'duration', 'kg')).toBe('0:00');
   });
 });

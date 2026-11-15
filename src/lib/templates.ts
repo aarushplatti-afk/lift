@@ -141,6 +141,13 @@ export function workoutInitFromTemplate(t: Template, ctx: OpsCtx): WorkoutInit {
   };
 }
 
+export function workoutInitFromWorkout(w: Workout, ctx: OpsCtx): WorkoutInit {
+  return {
+    name: w.name,
+    exercises: workoutExercisesFromTemplate(templateFromWorkout(w).exercises, ctx),
+  };
+}
+
 export function draftFromTemplate(t: Template, ctx: OpsCtx): TemplateDraft {
   return {
     id: t.id,

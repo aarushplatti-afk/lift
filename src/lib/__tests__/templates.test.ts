@@ -13,6 +13,7 @@ import {
   validateTemplateInput,
   workoutExercisesFromTemplate,
   workoutInitFromTemplate,
+  workoutInitFromWorkout,
 } from '../templates';
 import { NAME_MAX } from '../exercises';
 import type { OpsCtx } from '../workoutOps';
@@ -360,5 +361,72 @@ describe('generic workoutOps on a TemplateDraft', () => {
     expect(withEx).toMatchObject({ id: null, name: 'Keep', updatedAt: 77 });
     const weId = withEx.exercises[0]?.id ?? '';
     expect(addSet(withEx, weId, c).exercises[0]?.sets).toHaveLength(2);
+  });
+});
+
+describe('workoutInitFromWorkout', () => {
+  const source = (): Workout => ({
+    ...workout('Leg Day', [
+      we(
+        'a',
+        0,
+        [
+          ws({ weightKg: 45.359237, reps: 5, isPR: true, completed: true }),
+          ws({ weightKg: 50, reps: 5, completed: false }),
+          ws({ type: 'warmup', weightKg: 20, reps: 10, completed: true }),
+        ],
+        { restSeconds: 90, notes: 'felt good' },
+      ),
+      we('b', 1, [ws({ completed: false })]),
+      we('gone', 2, [ws({ durationSec: 30, completed: true })]),
+    ]),
+    templateId: 't-src',
+    notes: 'workout notes',
+  });
+
+  it('keeps only completed sets with exact values and types', () => {
+    const init = workoutInitFromWorkout(source(), ctx());
+    const list = init.exercises ?? [];
+    expect(list.map((e) => e.exerciseId)).toEqual(['a', 'gone']);
+    const sets = list[0]?.sets ?? [];
+    expect(sets).toHaveLength(2);
+    expect(sets[0]).toMatchObject({
+      type: 'normal',
+      weightKg: 45.359237,
+      reps: 5,
+      completed: false,
+    });
+    expect(sets[1]).toMatchObject({ type: 'warmup', weightKg: 20, reps: 10, completed: false });
+    expect(list[1]?.sets[0]?.durationSec).toBe(30);
+  });
+
+  it('copies name, keeps rest, omits templateId, notes and isPR', () => {
+    const init = workoutInitFromWorkout(source(), ctx());
+    const list = init.exercises ?? [];
+    expect(init.name).toBe('Leg Day');
+    expect('templateId' in init).toBe(false);
+    expect(list[0]?.restSeconds).toBe(90);
+    for (const e of list) {
+      expect('notes' in e).toBe(false);
+      for (const s of e.sets) {
+        expect('isPR' in s).toBe(false);
+        expect('completedAt' in s).toBe(false);
+      }
+    }
+  });
+
+  it('returns no exercises when nothing was completed', () => {
+    const w = workout('Empty', [we('a', 0, [ws({ completed: false })])]);
+    expect(workoutInitFromWorkout(w, ctx()).exercises).toEqual([]);
+  });
+
+  it('assigns fresh unique ids', () => {
+    const w = source();
+    const init = workoutInitFromWorkout(w, ctx());
+    const list = init.exercises ?? [];
+    const ids = list.flatMap((e) => [e.id, ...e.sets.map((s) => s.id)]);
+    expect(new Set(ids).size).toBe(ids.length);
+    const old = new Set(w.exercises.flatMap((e) => [e.id, ...e.sets.map((s) => s.id)]));
+    expect(ids.some((id) => old.has(id))).toBe(false);
   });
 });

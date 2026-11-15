@@ -137,7 +137,12 @@ export interface RemoteWorkout {
   template_id: string | null;
   deleted_at: string | null;
   exercises: {
-    sets: { weightKg?: number | null; reps?: number | null; completed?: boolean }[];
+    sets: {
+      weightKg?: number | null;
+      reps?: number | null;
+      completed?: boolean;
+      isPR?: boolean;
+    }[];
   }[];
 }
 

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '../schema';
 import { getRestTimer, setOwner, setRestTimer } from '../repos/meta';
 import {
+  deleteWorkout,
   discardWorkout,
   enqueueActiveWorkout,
   finishWorkout,
@@ -13,6 +14,7 @@ import {
   observeOtherInProgress,
   saveActiveWorkout,
   startWorkout,
+  updateCompletedWorkout,
 } from '../repos/workouts';
 import type { Exercise, Workout, WorkoutExercise } from '../../types/domain';
 
@@ -231,6 +233,23 @@ describe('finishWorkout', () => {
     expect(q[0]).toMatchObject({ recordId: w.id, op: 'upsert' });
   });
 
+  it('re-flags a later completed workout when finishing one that started earlier', async () => {
+    const late = wk('late', Date.now() + 1_000_000, 'completed', [block('a', 110, 5)]);
+    const lateSet = late.exercises[0]?.sets[0];
+    if (!lateSet) throw new Error('fixture');
+    lateSet.isPR = true;
+    await db.workouts.bulkPut([wk('old', 1, 'completed', [block('a', 100, 5)]), late]);
+    const w = await startWorkout({ exercises: [block('a', 120, 5)] });
+    const out = await finishWorkout(w, { markIncomplete: false });
+    if (out.status !== 'finished') throw new Error('expected finished');
+    expect(out.workout.exercises[0]?.sets[0]?.isPR).toBe(true);
+    const stored = await db.workouts.get('late');
+    expect(stored?.exercises[0]?.sets[0]?.isPR).toBeUndefined();
+    expect(stored?.updatedAt).toBeGreaterThan(1);
+    const q = await db.syncQueue.toArray();
+    expect(q.map((e) => e.recordId).sort()).toEqual(['late', w.id].sort());
+  });
+
   it('first-ever logging gets no PR flag', async () => {
     const w = await startWorkout({ exercises: [block('a', 110, 5)] });
     const out = await finishWorkout(w, { markIncomplete: false });
@@ -305,6 +324,15 @@ describe('listCompletedWorkouts / getWorkout', () => {
     expect((await listCompletedWorkouts()).map((w) => w.id)).toEqual(['b', 'd', 'a']);
   });
 
+  it('breaks startedAt ties by id desc', async () => {
+    await db.workouts.bulkPut([
+      wk('a', 10, 'completed'),
+      wk('c', 10, 'completed'),
+      wk('b', 10, 'completed'),
+    ]);
+    expect((await listCompletedWorkouts()).map((w) => w.id)).toEqual(['c', 'b', 'a']);
+  });
+
   it('is empty with no data', async () => {
     expect(await listCompletedWorkouts()).toEqual([]);
   });
@@ -340,6 +368,208 @@ describe('getLastCompletedWithExercises', () => {
   });
   it('returns an empty map for no ids', async () => {
     expect((await getLastCompletedWithExercises([], 1000)).size).toBe(0);
+  });
+});
+
+const DAY = 86_400_000;
+const T0 = Date.now() - 100 * DAY;
+
+function done(id: string, day: number, weightKg: number): Workout {
+  const startedAt = T0 + day * DAY;
+  return {
+    ...wk(id, startedAt, 'completed', [block('a', weightKg, 5)]),
+    endedAt: startedAt + 3_600_000,
+  };
+}
+
+const prOf = (w: Workout | undefined): boolean | undefined => w?.exercises[0]?.sets[0]?.isPR;
+
+async function seedHistory(): Promise<void> {
+  await db.exercises.put(ex('a'));
+  const w2 = done('w2', 2, 110);
+  const set = w2.exercises[0]?.sets[0];
+  if (!set) throw new Error('fixture');
+  set.isPR = true;
+  await db.workouts.bulkPut([done('w1', 1, 100), w2, done('w3', 3, 105)]);
+}
+
+async function edited(id: string, weightKg: number): Promise<Workout> {
+  const row = await db.workouts.get(id);
+  if (!row) throw new Error('fixture');
+  return { ...row, exercises: [block('a', weightKg, 5)] };
+}
+
+describe('updateCompletedWorkout', () => {
+  beforeEach(seedHistory);
+
+  it('lowering a PR writes both changed rows and enqueues both', async () => {
+    const out = await updateCompletedWorkout(await edited('w2', 95), { markIncomplete: false });
+    expect(out.status).toBe('saved');
+    expect(prOf(await db.workouts.get('w2'))).toBeUndefined();
+    const w3 = await db.workouts.get('w3');
+    expect(prOf(w3)).toBe(true);
+    expect(w3?.updatedAt).toBeGreaterThan(1);
+    const q = await db.syncQueue.toArray();
+    expect(q.map((e) => e.recordId).sort()).toEqual(['w2', 'w3']);
+    expect(q.every((e) => e.op === 'upsert')).toBe(true);
+    expect(prOf(await db.workouts.get('w1'))).toBeUndefined();
+    if (out.status === 'saved') expect(out.workout).toEqual(await db.workouts.get('w2'));
+  });
+
+  it('a no-op save writes nothing', async () => {
+    const stored = await db.workouts.get('w2');
+    if (!stored) throw new Error('fixture');
+    const out = await updateCompletedWorkout(structuredClone(stored), { markIncomplete: false });
+    expect(out).toEqual({ status: 'saved', workout: stored });
+    expect(await db.syncQueue.count()).toBe(0);
+    expect(await db.workouts.get('w2')).toEqual(stored);
+  });
+
+  it('returns not_found for a missing or in-progress row and writes nothing', async () => {
+    const w = await edited('w2', 95);
+    const missing = await updateCompletedWorkout({ ...w, id: 'ghost' }, { markIncomplete: false });
+    expect(missing).toEqual({ status: 'not_found' });
+    const ip = wk('ip', 5, 'in_progress', [block('a', 50, 5)]);
+    await db.workouts.put(ip);
+    const out = await updateCompletedWorkout({ ...ip, endedAt: 9 }, { markIncomplete: false });
+    expect(out).toEqual({ status: 'not_found' });
+    expect(await db.syncQueue.count()).toBe(0);
+    expect(await db.workouts.get('ip')).toEqual(ip);
+  });
+
+  it('returns invalid before writing', async () => {
+    const w = await edited('w2', 95);
+    const blank = await updateCompletedWorkout({ ...w, name: '   ' }, { markIncomplete: false });
+    expect(blank).toEqual({ status: 'invalid', error: { field: 'name', code: 'required' } });
+    const future = await updateCompletedWorkout(
+      { ...w, startedAt: Date.now() + DAY, endedAt: Date.now() + 2 * DAY },
+      { markIncomplete: false },
+    );
+    expect(future).toEqual({ status: 'invalid', error: { field: 'startedAt', code: 'future' } });
+    expect(await db.syncQueue.count()).toBe(0);
+    expect(prOf(await db.workouts.get('w2'))).toBe(true);
+  });
+
+  it('returns empty and writes nothing when nothing is left', async () => {
+    const w = await edited('w2', 95);
+    const cleared = { ...w, exercises: [block('a', 95, 5, false)] };
+    expect(await updateCompletedWorkout(cleared, { markIncomplete: false })).toEqual({
+      status: 'empty',
+    });
+    expect(await db.syncQueue.count()).toBe(0);
+    expect(prOf(await db.workouts.get('w2'))).toBe(true);
+  });
+
+  it('preserves identity fields from the stored row', async () => {
+    await db.workouts.put({ ...done('w2', 2, 110), templateId: 't9', createdAt: 77 });
+    const w = await edited('w2', 95);
+    const forged: Workout = {
+      ...w,
+      userId: 'evil',
+      createdAt: 5,
+      status: 'in_progress',
+      templateId: 'forged',
+    };
+    const out = await updateCompletedWorkout(forged, { markIncomplete: false });
+    if (out.status !== 'saved') throw new Error('expected saved');
+    expect(out.workout).toMatchObject({
+      userId: 'u1',
+      createdAt: 77,
+      status: 'completed',
+      templateId: 't9',
+    });
+  });
+
+  it('a draft cannot drop or add a templateId', async () => {
+    await db.workouts.put({ ...done('w2', 2, 110), templateId: 't9' });
+    const w = await edited('w2', 95);
+    const dropped: Workout = { ...w };
+    delete dropped.templateId;
+    await updateCompletedWorkout(dropped, { markIncomplete: false });
+    expect((await db.workouts.get('w2'))?.templateId).toBe('t9');
+    const none = await edited('w3', 90);
+    await updateCompletedWorkout({ ...none, templateId: 'x' }, { markIncomplete: false });
+    expect(await db.workouts.get('w3')).not.toHaveProperty('templateId');
+  });
+
+  it('markIncomplete true keeps valid incomplete sets, false drops them', async () => {
+    const w = await edited('w3', 105);
+    const withExtra: Workout = {
+      ...w,
+      exercises: [...w.exercises, { ...block('a', 50, 5, false), id: 'we-x', order: 1 }],
+    };
+    const dropped = await updateCompletedWorkout(withExtra, { markIncomplete: false });
+    if (dropped.status !== 'saved') throw new Error('expected saved');
+    expect(dropped.workout.exercises).toHaveLength(1);
+    const kept = await updateCompletedWorkout(withExtra, { markIncomplete: true });
+    if (kept.status !== 'saved') throw new Error('expected saved');
+    expect(kept.workout.exercises).toHaveLength(2);
+    expect(kept.workout.exercises[1]?.sets[0]?.completed).toBe(true);
+  });
+
+  it('removing an exercise from W2 gives W3 its PR back', async () => {
+    const w = await edited('w2', 110);
+    const out = await updateCompletedWorkout(
+      { ...w, exercises: [block('b', 50, 5)] },
+      { markIncomplete: false },
+    );
+    expect(out.status).toBe('saved');
+    expect(prOf(await db.workouts.get('w3'))).toBe(true);
+    expect((await db.syncQueue.toArray()).map((e) => e.recordId).sort()).toEqual(['w2', 'w3']);
+  });
+
+  it('a date change reorders the list and re-flags', async () => {
+    const w = await edited('w2', 110);
+    const startedAt = T0 + 4 * DAY;
+    await updateCompletedWorkout(
+      { ...w, startedAt, endedAt: startedAt + 3_600_000 },
+      { markIncomplete: false },
+    );
+    expect((await listCompletedWorkouts()).map((x) => x.id)).toEqual(['w2', 'w3', 'w1']);
+    expect(prOf(await db.workouts.get('w2'))).toBe(true);
+    expect(prOf(await db.workouts.get('w3'))).toBe(true);
+  });
+});
+
+describe('deleteWorkout', () => {
+  beforeEach(seedHistory);
+
+  it('removes the row, enqueues one delete, and gives the later workout its PR', async () => {
+    await deleteWorkout('w2');
+    expect(await db.workouts.get('w2')).toBeUndefined();
+    expect(prOf(await db.workouts.get('w3'))).toBe(true);
+    const q = await db.syncQueue.toArray();
+    expect(q.map((e) => `${e.recordId}:${e.op}`).sort()).toEqual(['w2:delete', 'w3:upsert']);
+  });
+
+  it('deleting a non-PR workout writes only the tombstone', async () => {
+    await deleteWorkout('w3');
+    const q = await db.syncQueue.toArray();
+    expect(q).toHaveLength(1);
+    expect(q[0]).toMatchObject({ recordId: 'w3', op: 'delete' });
+  });
+
+  it('is a no-op for a missing id', async () => {
+    await deleteWorkout('ghost');
+    expect(await db.syncQueue.count()).toBe(0);
+    expect(await db.workouts.count()).toBe(3);
+  });
+
+  it('throws for an in-progress workout and leaves the active row and meta alone', async () => {
+    const active = await startWorkout({ exercises: [block('a', 50, 5)] });
+    await expect(deleteWorkout(active.id)).rejects.toThrow(
+      'Use discardWorkout for in-progress workouts',
+    );
+    expect(await db.workouts.get(active.id)).toEqual(active);
+    expect((await db.meta.get('activeWorkoutId'))?.value).toBe(active.id);
+    expect(await db.syncQueue.count()).toBe(0);
+  });
+
+  it('keeps meta untouched when deleting a completed workout during an active one', async () => {
+    const active = await startWorkout();
+    await deleteWorkout('w2');
+    expect((await db.meta.get('activeWorkoutId'))?.value).toBe(active.id);
+    expect(await db.workouts.get(active.id)).toEqual(active);
   });
 });
 
