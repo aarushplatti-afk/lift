@@ -1,6 +1,6 @@
 # Lift — Progress Log
 
-Last updated: 2026-11-15. Branch: `m8-bodyweight`.
+Last updated: 2026-11-15. Branch: `m9-sync-data`.
 
 ## Done
 - Step 0: repo created, PRD moved to docs/PRD.md, Claude Code config (CLAUDE.md, agents, settings, commands).
@@ -95,8 +95,17 @@ Last updated: 2026-11-15. Branch: `m8-bodyweight`.
 - iOS tab bar: the installed app sometimes launched with the viewport short by the status-bar height, so the bar floated above the bottom edge. `src/lib/viewportFix.ts` detects a short viewport in iOS standalone mode only (at launch, on resume, after rotation, after the keyboard closes; never while a field is focused; gives up after 3 nudges that change nothing) and forces a re-layout, restoring focus and window scroll. Unverified on a real device by automation.
 - Open sign-up: "Create an account" on the sign-in screen (`signUp` in src/sync/auth.ts). Handles both email-confirmation settings and strips Supabase auth tokens from the URL hash. Each account gets its own seeded exercises; RLS already isolates data. PRD §1, §8 and §19 updated.
 
+- M9 Sync hardening and data tools (branch `m9-sync-data`, spec docs/milestones/M9-spec.md):
+  - Sync: backoff 2/5/15/60/120/300 s, error classification, a failed state with Retry and Discard (per record, plus Retry all and Discard all), a single 401 refresh-and-retry per run, a retry timer, `runExclusive`, and a stale-outbox warning after 24 h.
+  - JSON export and zod-validated import (Replace only, with a summary sheet and confirm dialog). Cross-account import remaps ids. Placeholder exercises keep exports re-importable.
+  - CSV export (formula-injection guard).
+  - Delete all: server tombstones first, then the local clear, then re-seed on the next sync.
+  - Storage estimate, `persist()` after finish, and a blocking quota dialog with Export.
+  - Settings: Account & Sync detail (pending and failed changes, last synced, Sync now, Sign out) and a Data section (export, CSV, import, delete all).
+  - Tests: 1298 unit tests in 105 files. RLS plus two-device simulation: 76 passed, 1 skipped. E2E: Flow E, cross-account import, delete-all on two devices, offline sync and expired token offline; full e2e run 27 passed, 1 skipped.
+
 ## In progress
-- M8 device check passed on the owner's phone (2026-11-15) apart from the two fixes above. M9 next.
+- M9 PR, then M10 hardening.
 - Known exception to "no unused exports": `pickPreviousWorkout`, `setGroup`, `SetGroup` and `RestPhase` are spec contracts used only in tests or inside their own module.
 
 ## Blocked
@@ -207,6 +216,17 @@ Last updated: 2026-11-15. Branch: `m8-bodyweight`.
   - Delete and restore check the owner.
   - B20: the same date on two devices gives one row; the last push wins by server `updated_at`.
   - B21: tests run with `TZ=America/New_York`.
+- 2026-11-15, M9 decisions (accepted architect defaults; reversible; full list N1–N22 in docs/milestones/M9-spec.md §0):
+  - N1/N2: error classes and backoff as specified. `23505` retries once, on the first attempt. Offline never counts as an attempt.
+  - N3/N4: permanent errors set `failed` and still block pull overwrite. Failed entries are never auto-retried. A newer pending edit of the same record supersedes them.
+  - N5: one token refresh per sync run. A rejected refresh shows "Session expired" and never signs the user out.
+  - N8: Discard is online only and applies the server row in one transaction.
+  - N9–N11: backups keep epoch ms and kg, and export completed workouts only. Cross-account import remaps ids deterministically. Import keeps stored `isPR` flags without recompute.
+  - N12/N13: delete all tombstones server rows directly, not through the outbox. It resets settings, then re-seeds on the next sync.
+  - N14: import and delete all are blocked offline or during an active workout. Import also needs an empty outbox after the pre-sync.
+  - N18/N19: persist after finish. Quota errors open the blocking dialog.
+  - N20/N21: CSV formula guard. Delete all needs the exact text `DELETE`. Import needs a summary and a confirm.
+  - N22: zod and CSV are lazy-loaded.
 - Defaults per PRD §16: lb, blue accent `#4F8CFF`, name "Lift".
 
 ## Known limitations (M6)
@@ -229,3 +249,14 @@ Last updated: 2026-11-15. Branch: `m8-bodyweight`.
 - Pre-existing `syncApply` deletes a different-id local row for the same date without checking pending upserts (legacy data only).
 - ExercisesView still nests Link inside Button for its CTA.
 - Settings is reachable only from the Workout home header.
+
+## Known limitations (M9)
+- iOS "Save to Files" via the share sheet is not yet verified on a device.
+- Changes on other devices that had not synced yet reappear after delete-all or import (by design, and stated in the UI).
+- A partial server delete-all stays visible on other devices until it is retried.
+- Merge import is out of scope.
+- Deleting the account itself is out of scope.
+- Password reset is deferred to M10.
+- The entry chunk is about 199.5 kB gz. M10 has the bundle target.
+- The QuotaDialog can be dismissed.
+- The first workout of an exercise is never a PR (existing behaviour).
