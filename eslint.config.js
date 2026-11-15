@@ -20,7 +20,14 @@ const rechartsPath = {
 
 export default tseslint.config(
   {
-    ignores: ['dist', 'coverage', 'playwright-report', 'test-results', 'supabase/.temp', 'dev-dist'],
+    ignores: [
+      'dist',
+      'coverage',
+      'playwright-report',
+      'test-results',
+      'supabase/.temp',
+      'dev-dist',
+    ],
   },
   {
     files: ['**/*.{ts,tsx}'],
@@ -44,7 +51,12 @@ export default tseslint.config(
     rules: { 'no-restricted-imports': ['error', { paths: [supabasePath, dexiePath] }] },
   },
   {
-    files: ['src/lib/supabase.ts', 'src/sync/**/*.{ts,tsx}', 'tests/rls/**/*.{ts,tsx}'],
+    files: [
+      'src/lib/supabase.ts',
+      'src/sync/**/*.{ts,tsx}',
+      'tests/rls/**/*.{ts,tsx}',
+      'tests/sync/**/*.{ts,tsx}',
+    ],
     rules: { 'no-restricted-imports': ['error', { paths: [dexiePath] }] },
   },
   {
