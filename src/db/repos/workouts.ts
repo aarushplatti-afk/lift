@@ -6,7 +6,7 @@ import { markTemplateUsed } from './templates';
 import { newId } from '../../lib/ids';
 import { defaultWorkoutName, type WorkoutInit } from '../../lib/workoutOps';
 import { prepareFinish } from '../../lib/calc/finish';
-import { computePRFlags } from '../../lib/calc/prs';
+import { recomputePRsForExercises } from '../../lib/calc/prs';
 import type { ExerciseTypes } from '../../lib/calc/volume';
 import type { Workout } from '../../types/domain';
 
@@ -104,15 +104,25 @@ export async function finishWorkout(
       const now = Date.now();
       const plan = prepareFinish(w, types, { markIncomplete: opts.markIncomplete, now });
       if (plan.isEmpty) return { status: 'empty' };
-      const flagged = computePRFlags(plan.cleaned, prior, types);
-      const workout: Workout = {
-        ...flagged,
+      const finished: Workout = {
+        ...plan.cleaned,
         status: 'completed',
         endedAt: Math.max(now, w.startedAt),
         updatedAt: now,
       };
+      const ids = new Set(plan.cleaned.exercises.map((we) => we.exerciseId));
+      const others = prior.filter((p) => p.id !== w.id);
+      const changed = recomputePRsForExercises(ids, [...others, finished], types);
+      const final = changed.get(finished.id);
+      const workout: Workout = final ? { ...final, updatedAt: now } : finished;
       await db.workouts.put(workout);
       await enqueue('workouts', workout.id, 'upsert', workout);
+      for (const [id, row] of changed) {
+        if (id === workout.id) continue;
+        const updated: Workout = { ...row, updatedAt: now };
+        await db.workouts.put(updated);
+        await enqueue('workouts', id, 'upsert', updated);
+      }
       if ((await readActiveId()) === workout.id) await db.meta.delete('activeWorkoutId');
       return { status: 'finished', workout };
     },

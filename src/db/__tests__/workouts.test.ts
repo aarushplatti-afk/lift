@@ -231,6 +231,23 @@ describe('finishWorkout', () => {
     expect(q[0]).toMatchObject({ recordId: w.id, op: 'upsert' });
   });
 
+  it('re-flags a later completed workout when finishing one that started earlier', async () => {
+    const late = wk('late', Date.now() + 1_000_000, 'completed', [block('a', 110, 5)]);
+    const lateSet = late.exercises[0]?.sets[0];
+    if (!lateSet) throw new Error('fixture');
+    lateSet.isPR = true;
+    await db.workouts.bulkPut([wk('old', 1, 'completed', [block('a', 100, 5)]), late]);
+    const w = await startWorkout({ exercises: [block('a', 120, 5)] });
+    const out = await finishWorkout(w, { markIncomplete: false });
+    if (out.status !== 'finished') throw new Error('expected finished');
+    expect(out.workout.exercises[0]?.sets[0]?.isPR).toBe(true);
+    const stored = await db.workouts.get('late');
+    expect(stored?.exercises[0]?.sets[0]?.isPR).toBeUndefined();
+    expect(stored?.updatedAt).toBeGreaterThan(1);
+    const q = await db.syncQueue.toArray();
+    expect(q.map((e) => e.recordId).sort()).toEqual(['late', w.id].sort());
+  });
+
   it('first-ever logging gets no PR flag', async () => {
     const w = await startWorkout({ exercises: [block('a', 110, 5)] });
     const out = await finishWorkout(w, { markIncomplete: false });

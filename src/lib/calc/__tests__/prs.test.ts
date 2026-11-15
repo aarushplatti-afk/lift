@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ExerciseType, Workout } from '../../../types/domain';
-import { computePRFlags } from '../prs';
+import { recomputePRsForExercises } from '../prs';
 import { mkEx, mkSet, mkWorkout } from './fixtures';
 
 const types = new Map<string, ExerciseType>([
@@ -15,12 +15,22 @@ const prior = (sets: Parameters<typeof mkEx>[2], over: Partial<Workout> = {}, ex
   mkWorkout('p1', [mkEx('pe', exId, sets)], { startedAt: 100, ...over });
 
 const current = (sets: Parameters<typeof mkEx>[2], exId = 'bench') =>
-  mkWorkout('cur', [mkEx('ce', exId, sets)], { startedAt: 1000, status: 'in_progress' });
+  mkWorkout('cur', [mkEx('ce', exId, sets)], { startedAt: 1000, status: 'completed' });
 
 const flags = (w: Workout): (boolean | undefined)[] =>
   w.exercises.flatMap((we) => we.sets.map((s) => s.isPR));
 
-describe('computePRFlags', () => {
+function computePRFlags(
+  workout: Workout,
+  priors: readonly Workout[],
+  t: ReadonlyMap<string, ExerciseType>,
+): Workout {
+  const ids = new Set(workout.exercises.map((we) => we.exerciseId));
+  const out = recomputePRsForExercises(ids, [...priors, workout], t);
+  return out.get(workout.id) ?? workout;
+}
+
+describe('recomputePRsForExercises (single workout vs priors)', () => {
   it('gives no flag for first-ever logging', () => {
     const out = computePRFlags(current([mkSet('a', { weightKg: 100, reps: 5 })]), [], types);
     expect(flags(out)).toEqual([undefined]);
@@ -113,11 +123,10 @@ describe('computePRFlags', () => {
     expect(flags(out)).toEqual([undefined]);
   });
 
-  it('ignores in-progress priors and priors with the same id', () => {
+  it('ignores in-progress priors', () => {
     const a = prior([mkSet('x', { weightKg: 300, reps: 1 })], { status: 'in_progress' });
-    const b = prior([mkSet('y', { weightKg: 300, reps: 1 })], { id: 'cur' });
     const c = prior([mkSet('z', { weightKg: 50, reps: 1 })], { id: 'p3' });
-    const out = computePRFlags(current([mkSet('a', { weightKg: 100, reps: 1 })]), [a, b, c], types);
+    const out = computePRFlags(current([mkSet('a', { weightKg: 100, reps: 1 })]), [a, c], types);
     expect(flags(out)).toEqual([true]);
   });
 
@@ -234,5 +243,158 @@ describe('computePRFlags', () => {
   it('handles empty workout', () => {
     const out = computePRFlags(mkWorkout('cur', []), [], types);
     expect(out.exercises).toEqual([]);
+  });
+});
+
+const wk = (id: string, startedAt: number, weights: number[], exId = 'bench'): Workout =>
+  mkWorkout(
+    id,
+    [
+      mkEx(
+        `e-${id}`,
+        exId,
+        weights.map((w, i) => mkSet(`${id}-s${i}`, { weightKg: w, reps: 1 })),
+      ),
+    ],
+    { startedAt },
+  );
+
+const A = new Set(['bench']);
+const flagsOf = (w: Workout | undefined): (boolean | undefined)[] => (w ? flags(w) : []);
+const apply = (list: readonly Workout[], out: Map<string, Workout>): Workout[] =>
+  list.map((w) => out.get(w.id) ?? w);
+
+describe('recomputePRsForExercises (history edits)', () => {
+  it('edit lowering a PR moves the flag to the next workout', () => {
+    const base = [wk('w1', 100, [100]), wk('w2', 200, [110]), wk('w3', 300, [105])];
+    const settled = apply(base, recomputePRsForExercises(A, base, types));
+    expect(settled.map(flags)).toEqual([[undefined], [true], [undefined]]);
+
+    const lowered = wk('w2', 200, [95]);
+    const withStale: Workout = {
+      ...lowered,
+      exercises: lowered.exercises.map((we) => ({
+        ...we,
+        sets: we.sets.map((s) => ({ ...s, isPR: true })),
+      })),
+    };
+    const out = recomputePRsForExercises(
+      A,
+      [settled[0] as Workout, withStale, settled[2] as Workout],
+      types,
+    );
+    expect([...out.keys()].sort()).toEqual(['w2', 'w3']);
+    expect(flagsOf(out.get('w2'))).toEqual([undefined]);
+    expect(flagsOf(out.get('w3'))).toEqual([true]);
+  });
+
+  it('deleting the PR workout flags the next one', () => {
+    const out = recomputePRsForExercises(A, [wk('w1', 100, [100]), wk('w3', 300, [105])], types);
+    expect([...out.keys()]).toEqual(['w3']);
+    expect(flagsOf(out.get('w3'))).toEqual([true]);
+  });
+
+  it('moving a workout between two others flags it and keeps the later PR', () => {
+    const list = [wk('w1', 100, [100]), wk('w2', 300, [110]), wk('w3', 200, [105])];
+    const out = recomputePRsForExercises(A, list, types);
+    expect(flagsOf(out.get('w3'))).toEqual([true]);
+    expect(flagsOf(out.get('w2'))).toEqual([true]);
+    expect(out.has('w1')).toBe(false);
+  });
+
+  it('a workout moved before the earliest is first-ever and nothing else is flagged', () => {
+    const list = [wk('w1', 200, [100]), wk('w2', 50, [110]), wk('w3', 300, [105])];
+    expect(recomputePRsForExercises(A, list, types).size).toBe(0);
+  });
+
+  it('does not flag a tie with an earlier best', () => {
+    const out = recomputePRsForExercises(A, [wk('w1', 100, [100]), wk('w2', 200, [100])], types);
+    expect(out.size).toBe(0);
+  });
+
+  it('flags the first set on an in-workout tie', () => {
+    const list = [wk('w1', 100, [100]), wk('w2', 200, [110, 110])];
+    const out = recomputePRsForExercises(A, list, types);
+    expect(flagsOf(out.get('w2'))).toEqual([true, undefined]);
+  });
+
+  it('flags both peers sharing a startedAt regardless of input order', () => {
+    const w1 = wk('w1', 100, [100]);
+    const pa = wk('pa', 200, [110]);
+    const pb = wk('pb', 200, [110]);
+    for (const list of [
+      [w1, pa, pb],
+      [pb, pa, w1],
+    ]) {
+      const out = recomputePRsForExercises(A, list, types);
+      expect(flagsOf(out.get('pa'))).toEqual([true]);
+      expect(flagsOf(out.get('pb'))).toEqual([true]);
+    }
+  });
+
+  it('merges peer maxima into the best only after the group', () => {
+    const list = [
+      wk('w1', 100, [100]),
+      wk('pa', 200, [110]),
+      wk('pb', 200, [120]),
+      wk('w4', 300, [115]),
+    ];
+    const out = recomputePRsForExercises(A, list, types);
+    expect(flagsOf(out.get('pa'))).toEqual([true]);
+    expect(flagsOf(out.get('pb'))).toEqual([true]);
+    expect(out.has('w4')).toBe(false);
+  });
+
+  it('leaves other exercises untouched and clears flags on unknown ids', () => {
+    const stale = mkWorkout(
+      'w2',
+      [
+        mkEx('ea', 'bench', [mkSet('a', { weightKg: 50, reps: 1 })], 0),
+        mkEx('eb', 'bench2', [mkSet('b', { weightKg: 50, reps: 1, isPR: true })], 1),
+        mkEx('eg', 'gone', [mkSet('g', { weightKg: 50, reps: 1, isPR: true })], 2),
+      ],
+      { startedAt: 200 },
+    );
+    const w1 = wk('w1', 100, [100]);
+    expect(recomputePRsForExercises(A, [w1, stale], types).size).toBe(0);
+    const out = recomputePRsForExercises(new Set(['gone']), [w1, stale], types).get('w2');
+    expect(out?.exercises[2]?.sets[0]?.isPR).toBeUndefined();
+    expect(out?.exercises[1]?.sets[0]?.isPR).toBe(true);
+  });
+
+  it('neither counts nor returns in-progress workouts', () => {
+    const ip: Workout = { ...wk('ip', 150, [500]), status: 'in_progress' };
+    const out = recomputePRsForExercises(
+      A,
+      [wk('w1', 100, [100]), ip, wk('w3', 200, [110])],
+      types,
+    );
+    expect([...out.keys()]).toEqual(['w3']);
+  });
+
+  it('is idempotent', () => {
+    const list = [wk('w1', 100, [100]), wk('w2', 200, [110]), wk('w3', 300, [105, 120])];
+    const settled = apply(list, recomputePRsForExercises(A, list, types));
+    expect(recomputePRsForExercises(A, settled, types).size).toBe(0);
+  });
+
+  it('does not mutate inputs and removes false flags as missing keys', () => {
+    const lowStale = mkWorkout(
+      'w2',
+      [mkEx('e', 'bench', [mkSet('s', { weightKg: 50, reps: 1, isPR: true })])],
+      { startedAt: 200 },
+    );
+    const list = [wk('w1', 100, [100]), lowStale];
+    const snap = structuredClone(list);
+    const out = recomputePRsForExercises(A, list, types);
+    expect(list).toEqual(snap);
+    const set = out.get('w2')?.exercises[0]?.sets[0];
+    expect(set).toBeDefined();
+    expect(set && 'isPR' in set).toBe(false);
+  });
+
+  it('returns an empty map for empty input', () => {
+    expect(recomputePRsForExercises(A, [], types).size).toBe(0);
+    expect(recomputePRsForExercises(new Set(), [wk('w1', 100, [100])], types).size).toBe(0);
   });
 });
