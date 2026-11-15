@@ -149,3 +149,20 @@ describe('SettingsPage', () => {
     expect(screen.getByRole('button', { name: 'Sync now' })).toBeDisabled();
   });
 });
+
+describe('SettingsPage bodyweight goal', () => {
+  it('saves the goal in kg and clears it through update', async () => {
+    renderPage();
+    await userEvent.type(screen.getByRole('textbox', { name: 'Goal weight in lb' }), '170{Enter}');
+    expect(update).toHaveBeenCalledTimes(1);
+    const patch = update.mock.calls[0]?.[0] as { bodyweightGoalKg: number };
+    expect(patch.bodyweightGoalKg).toBeCloseTo(77.111, 3);
+    act(() => {
+      useSettingsStore.setState({
+        settings: { ...DEFAULT_SETTINGS, unit: 'lb', bodyweightGoalKg: 77.111 },
+      });
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Clear goal' }));
+    expect(update).toHaveBeenLastCalledWith({ bodyweightGoalKg: undefined });
+  });
+});
