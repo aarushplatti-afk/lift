@@ -1,0 +1,33 @@
+.lift-chart .recharts-cartesian-grid-horizontal line {
+  stroke: rgb(var(--color-border) / 0.4);
+}
+
+.lift-chart .recharts-cartesian-axis-line,
+.lift-chart .recharts-cartesian-axis-tick-line {
+  stroke: rgb(var(--color-border));
+}
+
+.lift-chart .recharts-cartesian-axis-tick-value {
+  fill: rgb(var(--color-text-secondary));
+  font-size: 12px;
+}
+
+.lift-chart .recharts-line-curve {
+  stroke: rgb(var(--color-accent));
+  stroke-width: 2px;
+}
+
+.lift-chart .recharts-line-dot {
+  fill: rgb(var(--color-accent));
+  stroke: rgb(var(--color-surface));
+  stroke-width: 1px;
+}
+
+.lift-chart .recharts-tooltip-cursor {
+  stroke: rgb(var(--color-text-secondary) / 0.6);
+}
+
+.lift-chart .recharts-wrapper,
+.lift-chart .recharts-surface {
+  outline: none;
+}
