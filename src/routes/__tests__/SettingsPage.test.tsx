@@ -47,7 +47,12 @@ describe('SettingsPage', () => {
   });
 
   it('confirms before discarding unsynced changes on sign out', async () => {
-    signOut.mockResolvedValueOnce({ ok: false, reason: 'unsynced', pendingCount: 3 });
+    signOut.mockResolvedValueOnce({
+      ok: false,
+      reason: 'unsynced',
+      pendingCount: 3,
+      failedCount: 0,
+    });
     signOut.mockResolvedValueOnce({ ok: true });
     renderPage();
     await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
@@ -67,8 +72,41 @@ describe('SettingsPage', () => {
     });
   });
 
+  it('mentions rejected changes in the sign-out dialog', async () => {
+    signOut.mockResolvedValueOnce({
+      ok: false,
+      reason: 'unsynced',
+      pendingCount: 5,
+      failedCount: 2,
+    });
+    renderPage();
+    await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    expect(
+      await screen.findByText(/You have 5 unsynced changes, including 2 rejected\./),
+    ).toBeInTheDocument();
+  });
+
+  it('orders the sections as specified', () => {
+    renderPage();
+    const titles = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
+    expect(titles).toEqual([
+      'Units',
+      'Appearance',
+      'Workout',
+      'Bodyweight',
+      'Account & Sync',
+      'Data',
+      'About',
+    ]);
+  });
+
   it('uses the singular for one unsynced change', async () => {
-    signOut.mockResolvedValueOnce({ ok: false, reason: 'unsynced', pendingCount: 1 });
+    signOut.mockResolvedValueOnce({
+      ok: false,
+      reason: 'unsynced',
+      pendingCount: 1,
+      failedCount: 0,
+    });
     renderPage();
     await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
     expect(await screen.findByText(/You have 1 unsynced change\./)).toBeInTheDocument();
