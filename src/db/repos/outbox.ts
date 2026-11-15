@@ -213,6 +213,14 @@ export async function retryFailed(table?: SyncTable, recordId?: string): Promise
   });
 }
 
+export async function countOutboxByState(): Promise<{ pending: number; failed: number }> {
+  const [pending, failed] = await Promise.all([
+    db.syncQueue.where('state').equals('pending').count(),
+    db.syncQueue.where('state').equals('failed').count(),
+  ]);
+  return { pending, failed };
+}
+
 export async function countOutbox(): Promise<number> {
   return db.syncQueue.count();
 }

@@ -123,7 +123,7 @@ describe('signOut', () => {
     await meta.setOwner('u1', 'a@b.c');
     await runWrite(['exercises'], () => enqueue('exercises', 'e1', 'delete'));
     const blocked = await signOut({ discardUnsynced: false });
-    expect(blocked).toEqual({ ok: false, reason: 'unsynced', pendingCount: 1 });
+    expect(blocked).toEqual({ ok: false, reason: 'unsynced', pendingCount: 1, failedCount: 0 });
     expect(auth.signOut).not.toHaveBeenCalled();
     expect(await signOut({ discardUnsynced: true })).toEqual({ ok: true });
     expect(auth.signOut).toHaveBeenCalledWith({ scope: 'local' });

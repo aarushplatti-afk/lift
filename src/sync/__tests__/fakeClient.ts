@@ -31,6 +31,8 @@ export class FakeServer {
   failWhen: ((table: SyncTable, rows: Row[]) => string | FailSpec | null) | undefined;
   upsertCalls: { table: SyncTable; rows: Row[]; onConflict: string }[] = [];
   updateCalls: { table: SyncTable; values: Record<string, unknown>; ids: string[] }[] = [];
+  bulkCalls: { table: SyncTable; userId: string }[] = [];
+  failBulkWhen: ((table: SyncTable) => boolean) | undefined;
   selectCalls: { table: SyncTable; filter: string | undefined }[] = [];
   session: { user: { id: string } } | null = { user: { id: 'u1' } };
   onUpsert: (() => Promise<void>) | undefined;
@@ -131,6 +133,21 @@ export class FakeServer {
     return { data: null, error: null };
   }
 
+  bulkTombstone(table: SyncTable, userId: string, values: Record<string, unknown>): Result {
+    this.bulkCalls.push({ table, userId });
+    const down = this.fail();
+    if (down) return down;
+    if (this.failBulkWhen?.(table)) {
+      return { data: null, error: { message: 'boom', code: 'XX000' }, status: 500 };
+    }
+    for (const row of this.tables[table]) {
+      if (row.user_id === userId && (row.deleted_at ?? null) === null) {
+        Object.assign(row, values, { updated_at: this.clock });
+      }
+    }
+    return { data: null, error: null };
+  }
+
   select(table: SyncTable, userId: string, filter: string | undefined, limit: number): Result {
     this.selectCalls.push({ table, filter });
     const down = this.fail();
@@ -200,13 +217,16 @@ export function createFakeClient(server: FakeServer): LiftClient {
   const client = {
     from(table: SyncTable) {
       return {
-        async upsert(rows: Row[], opts: { onConflict: string }) {
+        async upsert(input: Row | Row[], opts: { onConflict: string }) {
           if (server.onUpsert) await server.onUpsert();
-          return server.upsert(table, rows, opts.onConflict);
+          return server.upsert(table, Array.isArray(input) ? input : [input], opts.onConflict);
         },
         update(values: Record<string, unknown>) {
           return {
             in: (_col: string, ids: string[]) => Promise.resolve(server.update(table, values, ids)),
+            eq: (_col: string, userId: string) => ({
+              is: () => Promise.resolve(server.bulkTombstone(table, userId, values)),
+            }),
           };
         },
         select: () => new Query(server, table),
