@@ -299,6 +299,27 @@ describe('Finish flow', () => {
     expect(useActiveWorkoutStore.getState().workout).not.toBeNull();
   });
 
+  it('filled but unticked sets offer Mark complete & finish instead of Nothing to save', async () => {
+    const user = userEvent.setup();
+    await seedBench();
+    await startStore();
+    renderApp();
+    await user.click(screen.getByRole('button', { name: 'Start Empty Workout' }));
+    await addBench(user);
+    await fillSet(user, 1, '135', '5');
+    await user.click(screen.getByRole('button', { name: '+ Add Set' }));
+    await fillSet(user, 2, '135', '5');
+    await user.click(screen.getByRole('button', { name: 'Finish' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Finish workout?' });
+    expect(screen.queryByRole('dialog', { name: 'Nothing to save' })).not.toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole('button', { name: 'Discard incomplete sets & finish' }),
+    ).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Mark complete & finish' }));
+    expect(await screen.findByText('Personal records')).toBeInTheDocument();
+    expect(screen.getByText('Sets').parentElement).toHaveTextContent('2');
+  });
+
   it('an empty workout leads to the discard dialog', async () => {
     const user = userEvent.setup();
     await startStore();

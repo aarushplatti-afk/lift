@@ -31,7 +31,8 @@ const SAVE_FAILED = 'Couldn’t save. Storage may be full.';
 const BAD_DATE_TIME = 'Enter a valid date and time';
 const EMPTY_PREVIOUS: Map<string, Workout> = new Map();
 
-type Stage = { kind: 'closed' } | { kind: 'incomplete'; count: number } | { kind: 'empty' };
+type Stage =
+  { kind: 'closed' } | { kind: 'incomplete'; count: number; onlyMark: boolean } | { kind: 'empty' };
 
 const CLOSED: Stage = { kind: 'closed' };
 
@@ -203,11 +204,18 @@ export function WorkoutEditor() {
       goDetail();
       return;
     }
-    const plan = prepareFinish(current.draft, types, { markIncomplete: false, now: Date.now() });
-    if (plan.isEmpty) setStage({ kind: 'empty' });
-    else if (plan.incompleteCount > 0)
-      setStage({ kind: 'incomplete', count: plan.incompleteCount });
-    else void run(false);
+    const now = Date.now();
+    const plan = prepareFinish(current.draft, types, { markIncomplete: false, now });
+    if (plan.incompleteCount === 0) {
+      if (plan.isEmpty) setStage({ kind: 'empty' });
+      else void run(false);
+      return;
+    }
+    if (prepareFinish(current.draft, types, { markIncomplete: true, now }).isEmpty) {
+      setStage({ kind: 'empty' });
+      return;
+    }
+    setStage({ kind: 'incomplete', count: plan.incompleteCount, onlyMark: plan.isEmpty });
   };
 
   const remove = async () => {
@@ -405,15 +413,17 @@ export function WorkoutEditor() {
           >
             Mark complete &amp; save
           </Button>
-          <Button
-            variant="secondary"
-            fullWidth
-            onClick={() => {
-              void run(false);
-            }}
-          >
-            Discard incomplete sets &amp; save
-          </Button>
+          {stage.kind === 'incomplete' && !stage.onlyMark && (
+            <Button
+              variant="secondary"
+              fullWidth
+              onClick={() => {
+                void run(false);
+              }}
+            >
+              Discard incomplete sets &amp; save
+            </Button>
+          )}
           <Button variant="ghost" fullWidth onClick={closeStage}>
             Cancel
           </Button>
