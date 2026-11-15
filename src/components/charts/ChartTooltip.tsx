@@ -24,7 +24,9 @@ export function ChartTooltip({ active, payload, render }: ChartTooltipProps) {
     <div className="rounded-control border border-border bg-surface px-3 py-2 shadow-lg">
       <p className="text-caption text-secondary">{text.title}</p>
       <p className="text-body font-semibold tabular-nums text-primary">{text.value}</p>
-      {text.detail ? <p className="text-caption tabular-nums text-secondary">{text.detail}</p> : null}
+      {text.detail ? (
+        <p className="text-caption tabular-nums text-secondary">{text.detail}</p>
+      ) : null}
     </div>
   );
 }

@@ -25,7 +25,14 @@ function makePoints(n: number): Point[] {
 
 function renderChart(points: Point[], metric: Metric = 'weight') {
   return render(
-    <ExerciseChart points={points} metric={metric} type="weight_reps" unit="lb" now={NOW} height={240} />,
+    <ExerciseChart
+      points={points}
+      metric={metric}
+      type="weight_reps"
+      unit="lb"
+      now={NOW}
+      height={240}
+    />,
   );
 }
 

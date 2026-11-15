@@ -2,7 +2,12 @@ import { useCallback, useMemo } from 'react';
 import { downsample, isZeroBased, metricKind } from '../../lib/calc/series';
 import type { Metric, Point } from '../../lib/calc/series';
 import { formatDurationInput } from '../../lib/duration';
-import { formatMetricValue, formatSetDetail, formatShortDate, formatVolume } from '../../lib/format';
+import {
+  formatMetricValue,
+  formatSetDetail,
+  formatShortDate,
+  formatVolume,
+} from '../../lib/format';
 import { toDisplay } from '../../lib/units';
 
 import type { ExerciseType, Unit } from '../../types/domain';
@@ -57,7 +62,10 @@ export function ExerciseChart({ points, metric, type, unit, now, height }: Exerc
         case 'volume':
           return {
             title,
-            value: kind === 'kg' ? formatVolume(point.value, unit) : formatMetricValue(point.value, kind, unit),
+            value:
+              kind === 'kg'
+                ? formatVolume(point.value, unit)
+                : formatMetricValue(point.value, kind, unit),
             detail: `${point.setCount} ${point.setCount === 1 ? 'set' : 'sets'}`,
           };
         case 'reps':

@@ -26,7 +26,10 @@ const YEAR_MS = 365 * 86_400_000;
 const Y_AXIS_WIDTH = 48;
 
 function prefersReducedMotion(): boolean {
-  return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  return (
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
 }
 
 function xTicks([lo, hi]: [number, number]): number[] {
@@ -41,7 +44,14 @@ function formatTick(t: number, spanMs: number): string {
   return `${month} ’${String(d.getFullYear()).slice(-2)}`;
 }
 
-export function LineChart({ data, height, zeroBased, formatY, renderTooltip, ariaLabel }: LineChartProps) {
+export function LineChart({
+  data,
+  height,
+  zeroBased,
+  formatY,
+  renderTooltip,
+  ariaLabel,
+}: LineChartProps) {
   const [ref, width] = useElementWidth<HTMLDivElement>();
   const axes = useMemo(() => {
     const domain = xDomain(data.map((d) => d.t));
@@ -92,7 +102,9 @@ export function LineChart({ data, height, zeroBased, formatY, renderTooltip, ari
           />
           <Tooltip
             cursor
-            content={(p) => <ChartTooltip active={p.active} payload={p.payload} render={renderTooltip} />}
+            content={(p) => (
+              <ChartTooltip active={p.active} payload={p.payload} render={renderTooltip} />
+            )}
           />
           <Line
             type={data.length >= 2 ? 'monotone' : 'linear'}
