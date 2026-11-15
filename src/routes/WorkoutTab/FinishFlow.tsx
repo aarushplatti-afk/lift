@@ -8,7 +8,8 @@ import { prepareFinish } from '../../lib/calc/finish';
 import type { ExerciseTypes } from '../../lib/calc/volume';
 import { useActiveWorkoutStore } from '../../store/activeWorkout';
 
-type Stage = { kind: 'closed' } | { kind: 'incomplete'; count: number } | { kind: 'empty' };
+type Stage =
+  { kind: 'closed' } | { kind: 'incomplete'; count: number; onlyMark: boolean } | { kind: 'empty' };
 
 const CLOSED: Stage = { kind: 'closed' };
 
@@ -55,14 +56,18 @@ export function useFinishFlow(types: ExerciseTypes): FinishFlow {
   const begin = () => {
     const w = useActiveWorkoutStore.getState().workout;
     if (!w) return;
-    const plan = prepareFinish(w, types, { markIncomplete: false, now: Date.now() });
-    if (plan.isEmpty) {
-      setStage({ kind: 'empty' });
-    } else if (plan.incompleteCount > 0) {
-      setStage({ kind: 'incomplete', count: plan.incompleteCount });
-    } else {
-      void run(false);
+    const now = Date.now();
+    const plan = prepareFinish(w, types, { markIncomplete: false, now });
+    if (plan.incompleteCount === 0) {
+      if (plan.isEmpty) setStage({ kind: 'empty' });
+      else void run(false);
+      return;
     }
+    if (prepareFinish(w, types, { markIncomplete: true, now }).isEmpty) {
+      setStage({ kind: 'empty' });
+      return;
+    }
+    setStage({ kind: 'incomplete', count: plan.incompleteCount, onlyMark: plan.isEmpty });
   };
 
   const close = () => {
@@ -86,15 +91,17 @@ export function useFinishFlow(types: ExerciseTypes): FinishFlow {
           >
             Mark complete &amp; finish
           </Button>
-          <Button
-            variant="secondary"
-            fullWidth
-            onClick={() => {
-              void run(false);
-            }}
-          >
-            Discard incomplete sets &amp; finish
-          </Button>
+          {stage.kind === 'incomplete' && !stage.onlyMark && (
+            <Button
+              variant="secondary"
+              fullWidth
+              onClick={() => {
+                void run(false);
+              }}
+            >
+              Discard incomplete sets &amp; finish
+            </Button>
+          )}
           <Button variant="ghost" fullWidth onClick={close}>
             Cancel
           </Button>
