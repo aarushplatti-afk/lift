@@ -1,12 +1,8 @@
 import type { ExerciseType, Workout, WorkoutSet } from '../../types/domain';
 import { setE1rm } from './e1rm';
-import { isWorkingSet, type ExerciseTypes } from './volume';
+import { isWorkingSet, round4, type ExerciseTypes } from './volume';
 
 type Category = 'weight' | 'e1rm' | 'reps' | 'duration';
-
-function round4(v: number): number {
-  return Math.round(v * 10000) / 10000;
-}
 
 function categoriesFor(type: ExerciseType): readonly Category[] {
   switch (type) {

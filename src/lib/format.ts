@@ -1,3 +1,4 @@
+import type { ValueKind } from './calc/series';
 import type { ExerciseType, Unit, WorkoutSet } from '../types/domain';
 import { formatDurationInput } from './duration';
 import { toDisplay } from './units';
@@ -55,21 +56,28 @@ function dayNumber(ms: number): number {
   return Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
 }
 
-export function formatLastUsed(at: number | undefined, now: number): string {
-  if (at === undefined) return 'Never used';
+export function formatShortDate(ms: number, now: number): string {
+  const d = new Date(ms);
+  const text = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return d.getFullYear() === new Date(now).getFullYear() ? text : `${text}, ${d.getFullYear()}`;
+}
+
+export function formatRelativeDay(at: number, now: number): string {
   const days = Math.max(0, dayNumber(now) - dayNumber(at));
-  if (days === 0) return 'Used today';
-  if (days === 1) return 'Used yesterday';
-  if (days < 7) return `Used ${days} days ago`;
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days} days ago`;
   if (days < 35) {
     const weeks = Math.floor(days / 7);
-    return `Used ${weeks} ${weeks === 1 ? 'week' : 'weeks'} ago`;
+    return `${weeks} ${weeks === 1 ? 'week' : 'weeks'} ago`;
   }
-  const date = new Date(at);
-  const text = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  return date.getFullYear() === new Date(now).getFullYear()
-    ? `Used ${text}`
-    : `Used ${text}, ${date.getFullYear()}`;
+  return formatShortDate(at, now);
+}
+
+export function formatLastUsed(at: number | undefined, now: number): string {
+  if (at === undefined) return 'Never used';
+  const text = formatRelativeDay(at, now);
+  return `Used ${text === 'Today' || text === 'Yesterday' ? text.toLowerCase() : text}`;
 }
 
 export function formatWorkoutDate(ms: number, now?: number): string {
@@ -101,4 +109,43 @@ export function formatSetDetail(set: WorkoutSet, type: ExerciseType, unit: Unit)
   if (type === 'bodyweight_reps') return `${set.reps ?? 0} reps`;
   const prefix = type === 'weighted_bodyweight' ? '+' : '';
   return `${prefix}${formatWeight(set.weightKg ?? 0, unit, { withUnit: true })} × ${set.reps ?? 0}`;
+}
+
+export function formatMetricValue(value: number, kind: ValueKind, unit: Unit): string {
+  switch (kind) {
+    case 'kg':
+      return formatWeight(value, unit, { withUnit: true });
+    case 'count':
+      return `${value} reps`;
+    case 'seconds':
+      return formatDurationInput(value);
+  }
+}
+
+const MINUS = '−';
+
+function signed(n: number, text: string): string {
+  if (n > 0) return `+${text}`;
+  if (n < 0) return `${MINUS}${text}`;
+  return text;
+}
+
+export function formatChange(
+  first: number,
+  last: number,
+  kind: ValueKind,
+  unit: Unit,
+): { abs: string; pct: string } {
+  const a = kind === 'kg' ? toDisplay(first, unit) : first;
+  const b = kind === 'kg' ? toDisplay(last, unit) : last;
+  const diff = Math.round((b - a) * 10) / 10;
+  const mag = Math.abs(diff);
+  let body: string;
+  if (kind === 'kg') body = `${String(mag)} ${unit}`;
+  else if (kind === 'count') body = `${String(mag)} reps`;
+  else body = formatDurationInput(mag);
+  const abs = signed(diff, body);
+  if (a === 0) return { abs, pct: '—' };
+  const pctValue = Math.round((diff / Math.abs(a)) * 100);
+  return { abs, pct: signed(pctValue, `${Math.abs(pctValue)}%`) };
 }

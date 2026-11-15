@@ -1,6 +1,6 @@
 import type { ExerciseType, Workout, WorkoutSet } from '../../types/domain';
 import { setE1rm } from './e1rm';
-import { isWorkingSet, setVolume } from './volume';
+import { isWorkingSet, round4, setVolume } from './volume';
 
 export type Metric = 'weight' | 'e1rm' | 'volume' | 'reps' | 'duration';
 export type ValueKind = 'kg' | 'count' | 'seconds';
@@ -11,10 +11,6 @@ export interface Point {
   workoutId: string;
   set?: WorkoutSet;
   setCount: number;
-}
-
-function round4(v: number): number {
-  return Math.round(v * 10000) / 10000;
 }
 
 export function metricsFor(type: ExerciseType): readonly Metric[] {

@@ -9,6 +9,10 @@ import { canCompleteSet } from './validation';
 
 export type ExerciseTypes = ReadonlyMap<string, ExerciseType>;
 
+export function round4(v: number): number {
+  return Math.round(v * 10000) / 10000;
+}
+
 export const EXCLUDED_SET_TYPES: readonly SetType[] = ['warmup'];
 
 export function isWorkingSet(set: WorkoutSet, type: ExerciseType): boolean {
