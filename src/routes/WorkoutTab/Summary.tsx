@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { StatTile } from '../../components/ui/StatTile';
+import { TrophyIcon } from '../../components/workout/TrophyIcon';
 import { SaveAsTemplateDialog } from '../../components/workout/SaveAsTemplateDialog';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -34,34 +36,6 @@ function prRows(
     }
   }
   return rows;
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-1 flex-col items-center gap-1 rounded-card border border-border bg-surface px-2 py-3">
-      <span className="text-title font-semibold tabular-nums">{value}</span>
-      <span className="text-caption text-secondary">{label}</span>
-    </div>
-  );
-}
-
-function TrophyIcon() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      className="shrink-0 text-pr-gold"
-    >
-      <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3" />
-    </svg>
-  );
 }
 
 export function Summary() {
@@ -102,9 +76,9 @@ export function Summary() {
       <Header title={workout.name} />
       <main className="flex flex-col gap-4 px-4 py-4">
         <div className="flex gap-2">
-          <Stat label="Duration" value={duration} />
-          <Stat label="Total volume" value={volume} />
-          <Stat label="Sets" value={String(completedSetCount(workout, types))} />
+          <StatTile label="Duration" value={duration} />
+          <StatTile label="Total volume" value={volume} />
+          <StatTile label="Sets" value={String(completedSetCount(workout, types))} />
         </div>
         <section aria-labelledby="pr-heading" className="flex flex-col gap-2">
           <h2 id="pr-heading" className="text-title-sm font-semibold">

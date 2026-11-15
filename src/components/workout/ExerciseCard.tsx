@@ -19,6 +19,7 @@ import { useActiveWorkoutStore } from '../../store/activeWorkout';
 import { useRestTimerStore } from '../../store/restTimer';
 import { useTemplateDraftStore } from '../../store/templateDraft';
 import { useSettingsStore } from '../../store/settings';
+import { useWorkoutEditStore } from '../../store/workoutEditDraft';
 import type {
   Exercise,
   ExerciseType,
@@ -38,8 +39,10 @@ interface ExerciseCardProps {
   exercise: Exercise | undefined;
   unit: Unit;
   previous: Workout | undefined;
-  mode?: 'workout' | 'template';
+  mode?: CardMode;
 }
+
+type CardMode = 'workout' | 'template' | 'edit';
 
 const DELETED_NAME = 'Deleted exercise';
 
@@ -68,9 +71,16 @@ interface CardActions {
   moveExercise: (weId: string, dir: -1 | 1) => void;
   setSetType: (weId: string, setId: string, type: SetType) => void;
   setRestSeconds: (weId: string, sec: number | null) => void;
+  toggleComplete: (weId: string, setId: string, type: ExerciseType) => CompleteResult;
+  setExerciseNotes: (weId: string, notes: string) => void;
 }
 
-function useCardActions(mode: 'workout' | 'template'): CardActions {
+const templateNoops = {
+  toggleComplete: (): CompleteResult => ({ ok: true, completed: false }),
+  setExerciseNotes: (): void => undefined,
+};
+
+function useCardActions(mode: CardMode): CardActions {
   const w = useActiveWorkoutStore(
     useShallow((s) => ({
       addSet: s.addSet,
@@ -80,6 +90,8 @@ function useCardActions(mode: 'workout' | 'template'): CardActions {
       moveExercise: s.moveExercise,
       setSetType: s.setSetType,
       setRestSeconds: s.setRestSeconds,
+      toggleComplete: s.toggleComplete,
+      setExerciseNotes: s.setExerciseNotes,
     })),
   );
   const t = useTemplateDraftStore(
@@ -91,9 +103,24 @@ function useCardActions(mode: 'workout' | 'template'): CardActions {
       moveExercise: s.moveExercise,
       setSetType: s.setSetType,
       setRestSeconds: s.setRestSeconds,
+      ...templateNoops,
     })),
   );
-  return mode === 'template' ? t : w;
+  const e = useWorkoutEditStore(
+    useShallow((s) => ({
+      addSet: s.addSet,
+      updateSet: s.updateSet,
+      removeSet: s.removeSet,
+      removeExercise: s.removeExercise,
+      moveExercise: s.moveExercise,
+      setSetType: s.setSetType,
+      setRestSeconds: s.setRestSeconds,
+      toggleComplete: s.toggleComplete,
+      setExerciseNotes: s.setExerciseNotes,
+    })),
+  );
+  if (mode === 'template') return t;
+  return mode === 'edit' ? e : w;
 }
 
 export function ExerciseCard({
@@ -106,10 +133,18 @@ export function ExerciseCard({
   mode = 'workout',
 }: ExerciseCardProps) {
   const template = mode === 'template';
-  const { addSet, updateSet, removeSet, removeExercise, moveExercise, setSetType, setRestSeconds } =
-    useCardActions(mode);
-  const toggleComplete = useActiveWorkoutStore((s) => s.toggleComplete);
-  const setExerciseNotes = useActiveWorkoutStore((s) => s.setExerciseNotes);
+  const edit = mode === 'edit';
+  const {
+    addSet,
+    updateSet,
+    removeSet,
+    removeExercise,
+    moveExercise,
+    setSetType,
+    setRestSeconds,
+    toggleComplete,
+    setExerciseNotes,
+  } = useCardActions(mode);
   const workoutId = useActiveWorkoutStore((s) => s.workout?.id);
   const settings = useSettingsStore((s) => s.settings);
   const startRest = useRestTimerStore((s) => s.start);
@@ -139,7 +174,7 @@ export function ExerciseCard({
 
   const handleToggle = (setId: string): CompleteResult => {
     const result = toggleComplete(we.id, setId, type);
-    if (result.ok && result.completed) {
+    if (!edit && result.ok && result.completed) {
       unlockChime();
       if (settings.hapticsEnabled) vibrate(HAPTIC_TAP);
       if (settings.restTimerAutoStart && workoutId !== undefined) {
@@ -183,7 +218,7 @@ export function ExerciseCard({
         </div>
       )}
 
-      <WorkoutSetTable type={type} unit={unit} mode={mode}>
+      <WorkoutSetTable type={type} unit={unit} mode={template ? 'template' : 'workout'}>
         {we.sets.map((s, i) => {
           const prev = template
             ? undefined
@@ -291,16 +326,18 @@ export function ExerciseCard({
           >
             Move down
           </Button>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setRestDraft(we.restSeconds ?? settings.defaultRestSeconds);
-              setRestOpen(true);
-              setMenuOpen(false);
-            }}
-          >
-            Rest timer: {restLabel}
-          </Button>
+          {!edit && (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setRestDraft(we.restSeconds ?? settings.defaultRestSeconds);
+                setRestOpen(true);
+                setMenuOpen(false);
+              }}
+            >
+              Rest timer: {restLabel}
+            </Button>
+          )}
           <Button
             variant="secondary"
             className="text-danger"

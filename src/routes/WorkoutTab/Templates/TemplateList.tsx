@@ -5,6 +5,7 @@ import { Dialog } from '../../../components/ui/Dialog';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { IconButton } from '../../../components/ui/IconButton';
 import { useToastStore } from '../../../components/ui/toastStore';
+import { WorkoutInProgressDialog } from '../../../components/workout/WorkoutInProgressDialog';
 import { deleteTemplate, duplicateTemplate, listTemplates } from '../../../db/repos/templates';
 import { useLiveQuery } from '../../../hooks/useLiveQuery';
 import { useNow } from '../../../hooks/useNow';
@@ -173,37 +174,12 @@ export function TemplateList() {
           setOptionsId(null);
         }}
       />
-      <Dialog
+      <WorkoutInProgressDialog
         open={blocked}
-        title="Workout in progress"
         onClose={() => {
           setBlocked(false);
         }}
-      >
-        <p className="mb-4 text-body-sm text-secondary">
-          Finish or discard your current workout before starting another.
-        </p>
-        <div className="flex flex-col gap-2">
-          <Button
-            fullWidth
-            onClick={() => {
-              setBlocked(false);
-              navigate('/workout/active');
-            }}
-          >
-            Resume workout
-          </Button>
-          <Button
-            variant="secondary"
-            fullWidth
-            onClick={() => {
-              setBlocked(false);
-            }}
-          >
-            Cancel
-          </Button>
-        </div>
-      </Dialog>
+      />
       <Dialog
         open={deleting !== null}
         title="Delete this template?"
