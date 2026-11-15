@@ -1,6 +1,6 @@
 # Lift — Progress Log
 
-Last updated: 2026-11-14. Branch: `m7-progress-exercises`.
+Last updated: 2026-11-15. Branch: `m8-bodyweight`.
 
 ## Done
 - Step 0: repo created, PRD moved to docs/PRD.md, Claude Code config (CLAUDE.md, agents, settings, commands).
@@ -81,9 +81,17 @@ Last updated: 2026-11-14. Branch: `m7-progress-exercises`.
   - Dependencies: `recharts` 3.10.1 and `react-is` 18.3.1 (exact). recharts is in the PRD stack; react-is is its peer dependency. ESLint restricts recharts imports to `src/components/charts`.
   - Bundle: entry chunk 189.41 kB gz (main was 187.70 kB gz, +1.7 kB, within the 5 kB budget). ExerciseChart (recharts) chunk 105.77 kB gz. ProgressTab chunk 3.03 kB gz. Lazy chunks are precached by the service worker.
   - Tests: 931 unit. E2E 19 pass, plus 1 opt-in perf spec (`PERF=1`): first dot 102 ms, range switch 45 ms, ≤ 500 dots, no long tasks. Flow C also passed on WebKit iPhone 13 emulation, including touch tap tooltip.
+- M7 confirmed; the owner moved on to M8.
+- M8 Bodyweight + PRs (branch `m8-bodyweight`, spec docs/milestones/M8-spec.md):
+  - Bodyweight view: log card with prefill and Update, date picker that blocks future dates, note. Chart with raw dots, EWMA trend line (`TREND_ALPHA` 0.1, gap-scaled) and a dashed goal line that is always in the domain. Ranges with fallback to All. Stats: Current, Change (neutral arrows), Min, Max, Average. Entries list paged at 30 with tap-to-edit sheet, swipe delete and 5 s Undo. Empty state.
+  - Settings → Bodyweight goal field (saves on blur or Enter; "Clear goal").
+  - PRs view grouped by exercise, with search and muscle chips (single-pass `recordsByExercise`).
+  - Bodyweight repo with a deterministic per-date id; delete then re-log revives the same server row. No migration, no Dexie bump, no new deps.
+  - Local-Supabase constraint tests (`tests/rls/bodyweight.test.ts`).
+  - Tests: 1073 unit; e2e 21 pass + 1 opt-in perf; RLS suite includes bodyweight constraints. Flow D passes on WebKit iPhone emulation with sheet delete (touch swipe is not emulatable).
 
 ## In progress
-- M7 merge + deploy, then owner device check (check-in milestone).
+- M8 merge + deploy, then owner device check (check-in milestone). Device check: Flow D in both themes, iOS date picker, swipe delete and Undo.
 - Known exception to "no unused exports": `pickPreviousWorkout`, `setGroup`, `SetGroup` and `RestPhase` are spec contracts used only in tests or inside their own module.
 
 ## Blocked
@@ -179,6 +187,20 @@ Last updated: 2026-11-14. Branch: `m7-progress-exercises`.
   - P17: volume change is shown grouped, like volume values.
   - P8: "No sessions yet" title copy.
   - Spec e2e corrections: third workout at 40 days ago; best set volume "510 kg".
+- 2026-11-15, M8 decisions (accepted architect defaults; reversible; full list B1–B21 in docs/milestones/M8-spec.md §0):
+  - B1/B3: the bodyweight id is `bodyweightId(userId, date)`. Delete is a local hard delete plus a server tombstone. Re-logging the same date revives the same row.
+  - B4: bodyweight delete has a 5 s Undo (workouts do not). `restoreEntry` keeps the snapshot `updatedAt`, because the server trigger sets `updated_at`. Undo conflict toast: "Couldn’t undo — this day was logged again."
+  - B5: future dates are blocked (`max` plus repo check). Dates are strict local calendar dates, min 1900-01-01.
+  - B6/B7: weight is valid when `0 < kg < 700` after rounding. Note max 200 characters.
+  - B8: the log card shows typed values until saved; changing the date resets them.
+  - B9: the edit sheet cannot change the date.
+  - B10/B13: trend is computed over all entries before range filtering. Change uses raw entries. `getLatest` is dropped (deviation from PLAN).
+  - B14: the entries list shows all entries, paged at 30.
+  - B16: a blank goal that is blurred reverts; only "Clear goal" clears it.
+  - B19: PRs are sorted alphabetically, and archived exercises are included.
+  - Delete and restore check the owner.
+  - B20: the same date on two devices gives one row; the last push wins by server `updated_at`.
+  - B21: tests run with `TZ=America/New_York`.
 - Defaults per PRD §16: lb, blue accent `#4F8CFF`, name "Lift".
 
 ## Known limitations (M6)
@@ -192,3 +214,12 @@ Last updated: 2026-11-14. Branch: `m7-progress-exercises`.
 - Touch tooltip persistence on iOS standalone is to be verified on the owner's device.
 - `yAxis` could in principle produce 3 ticks (spec asks for 4–5).
 - Vite warns that the entry chunk is over 500 kB raw. Pre-existing; bundle splitting is M10.
+
+## Known limitations (M8)
+- Swipe delete on real iOS is not verified by automation. Manual check on the owner's phone.
+- One toast slot: a second quick delete loses the first Undo.
+- A log card opened before midnight keeps its typed values after midnight.
+- A goal far from the data flattens the chart (the goal is always in the domain).
+- Pre-existing `syncApply` deletes a different-id local row for the same date without checking pending upserts (legacy data only).
+- ExercisesView still nests Link inside Button for its CTA.
+- Settings is reachable only from the Workout home header.
