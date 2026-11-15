@@ -10,6 +10,7 @@ import { getSupabase, type LiftClient } from '../lib/supabase';
 import type { SyncStatus } from '../types/sync';
 import { pullAll } from './pull';
 import { AUTH_TIMEOUT_MS, TIMED_OUT, withTimeout } from './timeout';
+import { createAuthRetry } from './authRetry';
 import { isNetworkError, OfflineError, pushOutbox } from './push';
 
 export type SyncReason = 'start' | 'visible' | 'online' | 'offline' | 'write' | 'signin' | 'manual';
@@ -43,7 +44,8 @@ export function createSyncEngine(deps: EngineDeps): SyncEngine {
 
   function startCounts(): void {
     countsSub = observeOutboxCounts().subscribe({
-      next: ({ pending, failed }) => setStatus({ pendingCount: pending, failedCount: failed }),
+      next: ({ pending, failed, oldestCreatedAt }) =>
+        setStatus({ pendingCount: pending, failedCount: failed, oldestPendingAt: oldestCreatedAt }),
       error: () => undefined,
     });
   }
@@ -71,7 +73,12 @@ export function createSyncEngine(deps: EngineDeps): SyncEngine {
         setStatus({ state: 'error', lastError: 'No local account for this session' });
         return;
       }
-      const pushed = await pushOutbox(client, { now: now(), force });
+      const authRetry = createAuthRetry(client);
+      const pushed = await pushOutbox(client, { now: now(), force, authRetry });
+      if (pushed.authExpired) {
+        setStatus({ state: 'error', lastError: 'Session expired. Sign in again to sync.' });
+        return;
+      }
       if (pushed.offline) {
         setStatus({ state: 'offline' });
         return;
@@ -88,7 +95,11 @@ export function createSyncEngine(deps: EngineDeps): SyncEngine {
       if (!(await isInitialPullDone())) await setInitialPullDone(true);
       let failed = pushed.failed;
       if (seeded > 0) {
-        const seedPush = await pushOutbox(client, { now: now(), force });
+        const seedPush = await pushOutbox(client, { now: now(), force, authRetry });
+        if (seedPush.authExpired) {
+          setStatus({ state: 'error', lastError: 'Session expired. Sign in again to sync.' });
+          return;
+        }
         if (seedPush.offline) {
           setStatus({ state: 'offline' });
           return;

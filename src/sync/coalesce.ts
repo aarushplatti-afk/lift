@@ -5,6 +5,7 @@ export type PushOp = {
   recordId: string;
   entryIds: number[];
   seq: number;
+  attempts: number;
 } & ({ op: 'upsert'; payload: SyncRecordMap[SyncTable] } | { op: 'delete'; payload: null });
 
 export function coalesce(entries: OutboxEntry[]): PushOp[] {
@@ -26,6 +27,7 @@ export function coalesce(entries: OutboxEntry[]): PushOp[] {
       recordId: last.entry.recordId,
       entryIds: list.map((x) => x.id),
       seq: last.id,
+      attempts: Math.max(...list.map((x) => x.entry.attempts)),
     };
     ops.push(
       last.entry.op === 'upsert'
