@@ -1,7 +1,6 @@
 import type { ExerciseType, Workout, WorkoutSet } from '../../types/domain';
 import { setE1rm } from './e1rm';
-import { canCompleteSet } from './validation';
-import type { ExerciseTypes } from './volume';
+import { isWorkingSet, type ExerciseTypes } from './volume';
 
 type Category = 'weight' | 'e1rm' | 'reps' | 'duration';
 
@@ -19,10 +18,6 @@ function categoriesFor(type: ExerciseType): readonly Category[] {
     case 'duration':
       return ['duration'];
   }
-}
-
-function isEligible(set: WorkoutSet, type: ExerciseType): boolean {
-  return set.completed && set.type !== 'warmup' && canCompleteSet(set, type).ok;
 }
 
 function valueOf(set: WorkoutSet, type: ExerciseType, cat: Category): number | undefined {
@@ -67,7 +62,7 @@ function winnersFor(
     if (type === undefined) continue;
     const sets = [...we.sets].sort((a, b) => a.order - b.order);
     for (const s of sets) {
-      if (!isEligible(s, type)) continue;
+      if (!isWorkingSet(s, type)) continue;
       for (const cat of categoriesFor(type)) {
         const v = valueOf(s, type, cat);
         if (v === undefined) continue;

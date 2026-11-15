@@ -4,6 +4,7 @@ import {
   completedSetCount,
   EXCLUDED_SET_TYPES,
   exerciseVolume,
+  isWorkingSet,
   setVolume,
   workoutVolume,
 } from '../volume';
@@ -91,5 +92,26 @@ describe('completedSetCount', () => {
   });
   it('is 0 for an empty workout', () => {
     expect(completedSetCount(mkWorkout('w', []))).toBe(0);
+  });
+});
+
+describe('isWorkingSet', () => {
+  it('accepts completed valid normal, drop and failure sets', () => {
+    for (const type of ['normal', 'drop', 'failure'] as const) {
+      expect(isWorkingSet(mkSet('a', { type, weightKg: 50, reps: 5 }), 'weight_reps')).toBe(true);
+    }
+  });
+  it('rejects warm-up, incomplete and invalid sets', () => {
+    expect(isWorkingSet(mkSet('a', { type: 'warmup', weightKg: 50, reps: 5 }), 'weight_reps')).toBe(
+      false,
+    );
+    expect(
+      isWorkingSet(mkSet('a', { completed: false, weightKg: 50, reps: 5 }), 'weight_reps'),
+    ).toBe(false);
+    expect(isWorkingSet(mkSet('a', { weightKg: 0, reps: 5 }), 'weight_reps')).toBe(false);
+  });
+  it('accepts zero added weight for weighted_bodyweight and duration sets', () => {
+    expect(isWorkingSet(mkSet('a', { weightKg: 0, reps: 5 }), 'weighted_bodyweight')).toBe(true);
+    expect(isWorkingSet(mkSet('a', { durationSec: 30 }), 'duration')).toBe(true);
   });
 });

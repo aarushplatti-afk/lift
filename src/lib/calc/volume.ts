@@ -11,6 +11,10 @@ export type ExerciseTypes = ReadonlyMap<string, ExerciseType>;
 
 export const EXCLUDED_SET_TYPES: readonly SetType[] = ['warmup'];
 
+export function isWorkingSet(set: WorkoutSet, type: ExerciseType): boolean {
+  return set.completed && !EXCLUDED_SET_TYPES.includes(set.type) && canCompleteSet(set, type).ok;
+}
+
 export function setVolume(set: WorkoutSet, type: ExerciseType): number {
   if (!set.completed) return 0;
   if (EXCLUDED_SET_TYPES.includes(set.type)) return 0;
