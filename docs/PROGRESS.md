@@ -1,6 +1,6 @@
 # Lift — Progress Log
 
-Last updated: 2026-11-14. Branch: `m6-history`.
+Last updated: 2026-11-14. Branch: `m7-progress-exercises`.
 
 ## Done
 - Step 0: repo created, PRD moved to docs/PRD.md, Claude Code config (CLAUDE.md, agents, settings, commands).
@@ -71,9 +71,19 @@ Last updated: 2026-11-14. Branch: `m6-history`.
   - PR recompute on edit, delete and finish (`recomputePRsForExercises`): chronological, same-timestamp workouts are peers.
   - Exercise Detail History tab lists past sessions newest first.
   - Tests: 790 unit; e2e 16/16 locally (new `e2e/auth/history.spec.ts`).
+- M6 confirmed by owner on phone.
+- Post-M6 fix merged (PR #8): finishing a workout whose sets were filled but none ticked showed "Nothing to save". It now offers "Mark complete & finish"; the discard option is hidden when it would leave nothing. Same in the History editor.
+- M7 Progress — exercises (branch `m7-progress-exercises`, spec docs/milestones/M7-spec.md):
+  - Progress tab with segmented control Exercises | Bodyweight (placeholder) | PRs (placeholder).
+  - Exercises view: exercise selector (trained exercises first), metric chips per type (Weight / Added weight, Est. 1RM, Volume / Total reps, Reps; duration shows Longest set), ranges 1M / 3M / 6M / 1Y / All (default 3M, falls back to All when a range has fewer than 2 points), line chart with touch tooltip (Recharts), stat cards (Current best, Change over range, Workouts, Last performed), recent sessions.
+  - Exercise Detail: Records tab and compact Chart tab with "View progress" link.
+  - Calc layer: series, range, axis and records (`src/lib/calc/`), with unit tests. Deterministic 2000-workout fixture.
+  - Dependencies: `recharts` 3.10.1 and `react-is` 18.3.1 (exact). recharts is in the PRD stack; react-is is its peer dependency. ESLint restricts recharts imports to `src/components/charts`.
+  - Bundle: entry chunk 189.41 kB gz (main was 187.70 kB gz, +1.7 kB, within the 5 kB budget). ExerciseChart (recharts) chunk 105.77 kB gz. ProgressTab chunk 3.03 kB gz. Lazy chunks are precached by the service worker.
+  - Tests: 931 unit. E2E 19 pass, plus 1 opt-in perf spec (`PERF=1`): first dot 102 ms, range switch 45 ms, ≤ 500 dots, no long tasks. Flow C also passed on WebKit iPhone 13 emulation, including touch tap tooltip.
 
 ## In progress
-- M6 merge + deploy, then owner device check (check-in milestone).
+- M7 merge + deploy, then owner device check (check-in milestone).
 - Known exception to "no unused exports": `pickPreviousWorkout`, `setGroup`, `SetGroup` and `RestPhase` are spec contracts used only in tests or inside their own module.
 
 ## Blocked
@@ -158,6 +168,17 @@ Last updated: 2026-11-14. Branch: `m6-history`.
   - History search and filter deferred to M10.
   - Delete failure toast: "Couldn’t delete. Try again."
   - Duration validation copy: "Enter a valid duration".
+- 2026-11-14, M7 decisions (accepted architect defaults; reversible; full list P1–P24 in docs/milestones/M7-spec.md §0):
+  - P1: Bodyweight and PRs views are placeholders until M8.
+  - P1 (chips): Reps chip shipped.
+  - P3/P4: top set = heaviest weight.
+  - P11/P10: rangeStats has no change field. Change is computed from the displayed rounded values (deviation from PLAN). Change is shown in neutral colour.
+  - P14: selection is memory-only. URL deep link `?exercise=` is applied once, then cleared.
+  - P19: reps records only for bodyweight and weighted_bodyweight types.
+  - P20: compact chart uses the All range.
+  - P17: volume change is shown grouped, like volume values.
+  - P8: "No sessions yet" title copy.
+  - Spec e2e corrections: third workout at 40 days ago; best set volume "510 kg".
 - Defaults per PRD §16: lb, blue accent `#4F8CFF`, name "Lift".
 
 ## Known limitations (M6)
@@ -166,3 +187,8 @@ Last updated: 2026-11-14. Branch: `m6-history`.
 - The minutes field silently clamps values above 59 until blur.
 - History row `aria-label` omits PR and volume.
 - E2E has a fixed 3 s wait after sign-in.
+
+## Known limitations (M7)
+- Touch tooltip persistence on iOS standalone is to be verified on the owner's device.
+- `yAxis` could in principle produce 3 ticks (spec asks for 4–5).
+- Vite warns that the entry chunk is over 500 kB raw. Pre-existing; bundle splitting is M10.
