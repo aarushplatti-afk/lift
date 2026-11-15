@@ -120,7 +120,7 @@ beforeEach(async () => {
 });
 
 describe('Progress tab shell', () => {
-  it('shows the three segments with the Bodyweight view and a PRs placeholder', async () => {
+  it('shows the three segments with the Bodyweight view and the PRs view', async () => {
     renderTab();
     const group = screen.getByRole('radiogroup', { name: 'Progress views' });
     expect(
@@ -132,8 +132,8 @@ describe('Progress tab shell', () => {
     expect(await screen.findByText('No weigh-ins yet')).toBeInTheDocument();
     expect(screen.getByText('Log your first weigh-in to start tracking.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('radio', { name: 'PRs' }));
-    expect(screen.getByText('Personal records')).toBeInTheDocument();
-    expect(screen.getByText(/A full records list is coming soon/)).toBeInTheDocument();
+    expect(await screen.findByText('No records yet')).toBeInTheDocument();
+    expect(screen.getByText('Finish a workout to set your first records.')).toBeInTheDocument();
   });
 
   it('shows the empty state with a start link when nothing is logged', async () => {
