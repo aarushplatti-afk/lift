@@ -3,6 +3,7 @@ import { db } from '../../db/schema';
 import { enqueue, runWrite } from '../../db/repos/outbox';
 import { setOwner, wipeLocalData } from '../../db/repos/meta';
 import { getCursor } from '../../db/repos/syncApply';
+import { AuthExpiredError, createAuthRetry } from '../authRetry';
 import { buildKeysetFilter, pullAll, pullTable } from '../pull';
 import { createFakeClient, exerciseRecord, exerciseRow, FakeServer } from './fakeClient';
 
@@ -103,5 +104,26 @@ describe('pullTable', () => {
       'user_settings',
     ]);
     expect(await db.exercises.count()).toBe(2);
+  });
+});
+
+describe('pull auth retry', () => {
+  it('refreshes once on a 401 and continues the pull', async () => {
+    server.seed('exercises', [exerciseRow('a', TS)]);
+    server.tokenValid = false;
+    const client = createFakeClient(server);
+    const authRetry = createAuthRetry(client);
+    await pullAll(client, 'u1', undefined, authRetry);
+    expect(server.refreshCalls).toBe(1);
+    expect(await db.exercises.get('a')).toBeDefined();
+  });
+
+  it('throws AuthExpiredError when the refresh is rejected', async () => {
+    server.tokenValid = false;
+    server.refreshMode = 'rejected';
+    const client = createFakeClient(server);
+    await expect(pullAll(client, 'u1', undefined, createAuthRetry(client))).rejects.toBeInstanceOf(
+      AuthExpiredError,
+    );
   });
 });

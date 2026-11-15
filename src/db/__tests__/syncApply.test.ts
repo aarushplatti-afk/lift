@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '../schema';
 import { enqueue, runWrite } from '../repos/outbox';
 import { OwnerChangedError, setOwner } from '../repos/meta';
-import { applyServerRecords, getCursor, setCursor } from '../repos/syncApply';
+import { applyServerRecords, discardAndApply, getCursor, setCursor } from '../repos/syncApply';
 import type { BodyweightEntry, Exercise, Settings, Workout } from '../../types/domain';
 
 const wk = (id: string, name = 'W'): Workout => ({
@@ -197,6 +197,75 @@ describe('applyServerRecords', () => {
     };
     await applyServerRecords('user_settings', [{ record: settings, deleted: false }], 'u1');
     expect(await db.settings.get('singleton')).toEqual(settings);
+  });
+});
+
+describe('discardAndApply', () => {
+  async function failedLocal(id: string, name: string): Promise<void> {
+    await runWrite(['exercises'], async () => {
+      await db.exercises.put(ex(id, name));
+      await enqueue('exercises', id, 'upsert', ex(id, name));
+      await enqueue('exercises', id, 'upsert', ex(id, `${name}2`));
+    });
+  }
+
+  it('removes all entries of the record and applies the server row in one step', async () => {
+    await failedLocal('a', 'Local');
+    await failedLocal('b', 'Keep');
+    await discardAndApply('exercises', 'a', { record: ex('a', 'Server', 9), deleted: false }, 'u1');
+    expect((await db.exercises.get('a'))?.name).toBe('Server');
+    const left = await db.syncQueue.toArray();
+    expect(left.every((e) => e.recordId === 'b')).toBe(true);
+    expect(left).toHaveLength(2);
+  });
+
+  it('deletes the local row when there is no server row or it is deleted', async () => {
+    await failedLocal('a', 'Local');
+    await discardAndApply('exercises', 'a', null, 'u1');
+    expect(await db.exercises.get('a')).toBeUndefined();
+    await failedLocal('c', 'Local');
+    await discardAndApply('exercises', 'c', { record: ex('c'), deleted: true }, 'u1');
+    expect(await db.exercises.get('c')).toBeUndefined();
+    expect(await db.syncQueue.count()).toBe(0);
+  });
+
+  it('replaces a same-date bodyweight row with a different id', async () => {
+    await db.bodyweight.put(bw('local', '2026-01-01', 80));
+    await discardAndApply(
+      'bodyweight_entries',
+      'x',
+      { record: bw('server', '2026-01-01', 81), deleted: false },
+      'u1',
+    );
+    expect((await db.bodyweight.toArray()).map((r) => r.id)).toEqual(['server']);
+  });
+
+  it('keeps the active workout row but still removes its entries', async () => {
+    await db.workouts.put(wk('act', 'Local'));
+    await db.meta.put({ key: 'activeWorkoutId', value: 'act' });
+    await db.syncQueue.add({
+      table: 'workouts',
+      recordId: 'act',
+      op: 'upsert',
+      payload: wk('act'),
+      state: 'failed',
+      attempts: 1,
+      nextAttemptAt: 0,
+      createdAt: 1,
+    });
+    await discardAndApply('workouts', 'act', null, 'u1');
+    expect(await db.workouts.get('act')).toBeDefined();
+    expect(await db.syncQueue.count()).toBe(0);
+  });
+
+  it('rolls back and writes nothing when the owner changed', async () => {
+    await failedLocal('a', 'Local');
+    await setOwner('u2', 'b@b.c');
+    await expect(discardAndApply('exercises', 'a', null, 'u1')).rejects.toBeInstanceOf(
+      OwnerChangedError,
+    );
+    expect(await db.exercises.get('a')).toBeDefined();
+    expect(await db.syncQueue.count()).toBe(2);
   });
 });
 
