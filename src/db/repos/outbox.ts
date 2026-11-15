@@ -1,11 +1,15 @@
 import Dexie, { liveQuery, type Observable } from 'dexie';
 import { db, LOCAL_TABLE } from '../schema';
+import { reportStorageError } from '../../lib/storageEvents';
 import type { DeletableTable, OutboxEntry, SyncRecordMap, SyncTable } from '../../types/sync';
 
 export function runWrite<T>(tables: readonly SyncTable[], fn: () => Promise<T>): Promise<T> {
   const names = new Set<string>(tables.map((t) => LOCAL_TABLE[t]));
   names.add('syncQueue');
-  return db.transaction('rw', [...names], fn);
+  return db.transaction('rw', [...names], fn).catch((err: unknown) => {
+    reportStorageError(err);
+    throw err;
+  });
 }
 
 export function enqueue<T extends SyncTable>(

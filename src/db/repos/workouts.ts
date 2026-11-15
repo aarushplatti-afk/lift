@@ -1,6 +1,7 @@
 import { liveQuery, type Observable } from 'dexie';
 import { db } from '../schema';
 import { enqueue } from './outbox';
+import { reportStorageError } from '../../lib/storageEvents';
 import { requireUserId } from './meta';
 import { markTemplateUsed } from './templates';
 import { newId } from '../../lib/ids';
@@ -81,13 +82,18 @@ export function observeOtherInProgress(): Observable<Workout[]> {
 }
 
 export async function saveActiveWorkout(w: Workout): Promise<boolean> {
-  return db.transaction('rw', [db.workouts, db.meta], async () => {
-    if ((await readActiveId()) !== w.id) return false;
-    const row = await db.workouts.get(w.id);
-    if (row?.status !== 'in_progress') return false;
-    await db.workouts.put({ ...w, updatedAt: Date.now() });
-    return true;
-  });
+  return db
+    .transaction('rw', [db.workouts, db.meta], async () => {
+      if ((await readActiveId()) !== w.id) return false;
+      const row = await db.workouts.get(w.id);
+      if (row?.status !== 'in_progress') return false;
+      await db.workouts.put({ ...w, updatedAt: Date.now() });
+      return true;
+    })
+    .catch((err: unknown) => {
+      reportStorageError(err);
+      throw err;
+    });
 }
 
 export async function enqueueActiveWorkout(id: string): Promise<void> {
