@@ -36,7 +36,7 @@ function requirePositive(name: string, value: number): void {
   }
 }
 
-function sanitize(data: SettingsData): SettingsData {
+export function sanitizeSettings(data: SettingsData): SettingsData {
   requirePositive('weightIncrementLb', data.weightIncrementLb);
   requirePositive('weightIncrementKg', data.weightIncrementKg);
   requirePositive('defaultRestSeconds', data.defaultRestSeconds);
@@ -65,7 +65,7 @@ export async function updateSettings(patch: SettingsPatch): Promise<void> {
     const merged: SettingsData = { ...current, ...patch };
     if (merged.bodyweightGoalKg === undefined) delete merged.bodyweightGoalKg;
     const record: Settings = {
-      ...sanitize(merged),
+      ...sanitizeSettings(merged),
       id: 'singleton',
       userId,
       updatedAt: Date.now(),
