@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
+import { ChunkErrorBoundary } from '../../components/ui/ChunkErrorBoundary';
 import { Dialog } from '../../components/ui/Dialog';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Header } from '../../components/ui/Header';
@@ -23,6 +24,7 @@ import { formatPreviousSet, formatWorkoutDate } from '../../lib/format';
 import { useSettingsStore } from '../../store/settings';
 import type { Exercise, Workout } from '../../types/domain';
 import { BackLink } from './BackLink';
+import { RecordsPanel } from './RecordsPanel';
 
 type DetailTab = 'history' | 'records' | 'chart';
 
@@ -32,13 +34,7 @@ const TAB_OPTIONS: readonly { value: DetailTab; label: string }[] = [
   { value: 'chart', label: 'Chart' },
 ];
 
-const TAB_PLACEHOLDER: Record<
-  Exclude<DetailTab, 'history'>,
-  { title: string; description: string }
-> = {
-  records: { title: 'No records yet', description: 'Personal records will appear here.' },
-  chart: { title: 'No data to chart', description: 'Progress charts will appear here.' },
-};
+const ExerciseMiniChart = lazy(() => import('../../components/charts/ExerciseMiniChart'));
 
 const SAVE_FAILED = 'Couldn’t save. Storage may be full.';
 
@@ -101,6 +97,24 @@ function HistoryPanel({ exercise }: { exercise: Exercise }) {
         );
       })}
     </ul>
+  );
+}
+
+function ChartPanel({ exercise }: { exercise: Exercise }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <ChunkErrorBoundary>
+        <Suspense fallback={null}>
+          <ExerciseMiniChart exercise={exercise} />
+        </Suspense>
+      </ChunkErrorBoundary>
+      <Link
+        to={`/progress?exercise=${exercise.id}`}
+        className="inline-flex min-h-tap items-center justify-center text-body font-semibold text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+      >
+        View progress
+      </Link>
+    </div>
   );
 }
 
@@ -209,14 +223,9 @@ function Detail({ exercise, used }: { exercise: Exercise; used: boolean }) {
           value={tab}
           onChange={setTab}
         />
-        {tab === 'history' ? (
-          <HistoryPanel exercise={exercise} />
-        ) : (
-          <EmptyState
-            title={TAB_PLACEHOLDER[tab].title}
-            description={TAB_PLACEHOLDER[tab].description}
-          />
-        )}
+        {tab === 'history' && <HistoryPanel exercise={exercise} />}
+        {tab === 'records' && <RecordsPanel exercise={exercise} />}
+        {tab === 'chart' && <ChartPanel exercise={exercise} />}
 
         {showAction && (
           <Button

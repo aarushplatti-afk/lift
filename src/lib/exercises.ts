@@ -1,3 +1,4 @@
+import type { TrainedExercise } from './calc/records';
 import type { Equipment, Exercise, ExerciseType, MuscleGroup } from '../types/domain';
 
 export const NAME_MAX = 60;
@@ -76,4 +77,29 @@ export function groupByInitial(list: Exercise[]): { letter: string; items: Exerc
     items.push(ex);
   }
   return groups;
+}
+
+const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+
+function byName(a: Exercise, b: Exercise): number {
+  return collator.compare(a.name, b.name) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+}
+
+export function selectorSections(
+  exercises: readonly Exercise[],
+  trained: readonly TrainedExercise[],
+  query: string,
+): { trained: Exercise[]; others: Exercise[] } {
+  const byId = new Map(exercises.map((e) => [e.id, e]));
+  const trainedIds = new Set(trained.map((t) => t.exerciseId));
+  const trainedList: Exercise[] = [];
+  for (const t of trained) {
+    const e = byId.get(t.exerciseId);
+    if (e && matchesQuery(e.name, query)) trainedList.push(e);
+  }
+  if (searchKey(query) === '') return { trained: trainedList, others: [] };
+  const others = exercises
+    .filter((e) => !e.archived && !trainedIds.has(e.id) && matchesQuery(e.name, query))
+    .sort(byName);
+  return { trained: trainedList, others };
 }

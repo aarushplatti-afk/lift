@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   formatDurationShort,
   formatElapsed,
+  formatChange,
   formatLastUsed,
+  formatMetricValue,
   formatPreviousSet,
+  formatRelativeDay,
   formatSetDetail,
+  formatShortDate,
   formatVolume,
   formatWeight,
   formatWorkoutDate,
@@ -198,5 +202,96 @@ describe('formatSetDetail', () => {
   it('formats duration', () => {
     expect(formatSetDetail(set({ durationSec: 75 }), 'duration', 'kg')).toBe('1:15');
     expect(formatSetDetail(set({}), 'duration', 'kg')).toBe('0:00');
+  });
+});
+
+describe('formatRelativeDay', () => {
+  const at = (y: number, m: number, d: number, h = 12): number =>
+    new Date(y, m - 1, d, h).getTime();
+  const now = at(2026, 11, 14);
+
+  it('covers each band', () => {
+    expect(formatRelativeDay(at(2026, 11, 14, 0), at(2026, 11, 14, 23))).toBe('Today');
+    expect(formatRelativeDay(at(2026, 11, 15), now)).toBe('Today');
+    expect(formatRelativeDay(at(2026, 11, 13, 23), at(2026, 11, 14, 1))).toBe('Yesterday');
+    expect(formatRelativeDay(at(2026, 11, 11), now)).toBe('3 days ago');
+    expect(formatRelativeDay(at(2026, 11, 8), now)).toBe('6 days ago');
+    expect(formatRelativeDay(at(2026, 11, 7), now)).toBe('1 week ago');
+    expect(formatRelativeDay(at(2026, 10, 31), now)).toBe('2 weeks ago');
+    expect(formatRelativeDay(at(2026, 10, 11), now)).toBe('4 weeks ago');
+    expect(formatRelativeDay(at(2026, 10, 10), now)).toBe('Oct 10');
+  });
+
+  it('adds the year only when it differs', () => {
+    expect(formatRelativeDay(at(2025, 11, 4), at(2026, 1, 20))).toBe('Nov 4, 2025');
+    expect(formatRelativeDay(at(2025, 12, 31, 23), at(2026, 1, 1, 1))).toBe('Yesterday');
+  });
+
+  it('is exact across DST changes', () => {
+    expect(formatRelativeDay(at(2026, 3, 7, 23), at(2026, 3, 9, 0))).toBe('2 days ago');
+    expect(formatRelativeDay(at(2026, 11, 1, 12), at(2026, 11, 2, 12))).toBe('Yesterday');
+  });
+});
+
+describe('formatShortDate', () => {
+  it('omits the year in the current year and includes it otherwise', () => {
+    const now = new Date(2026, 10, 14).getTime();
+    expect(formatShortDate(new Date(2026, 10, 4).getTime(), now)).toBe('Nov 4');
+    expect(formatShortDate(new Date(2025, 10, 4).getTime(), now)).toBe('Nov 4, 2025');
+  });
+});
+
+describe('formatMetricValue', () => {
+  it('formats each kind', () => {
+    expect(formatMetricValue(lbToKg(262.5), 'kg', 'lb')).toBe('262.5 lb');
+    expect(formatMetricValue(100, 'kg', 'kg')).toBe('100 kg');
+    expect(formatMetricValue(12, 'count', 'lb')).toBe('12 reps');
+    expect(formatMetricValue(90, 'seconds', 'lb')).toBe('1:30');
+  });
+});
+
+describe('formatChange', () => {
+  it('formats a gain in lb', () => {
+    expect(formatChange(lbToKg(205), lbToKg(225), 'kg', 'lb')).toEqual({
+      abs: '+20 lb',
+      pct: '+10%',
+    });
+  });
+  it('uses U+2212 for negatives', () => {
+    expect(formatChange(lbToKg(225), lbToKg(220), 'kg', 'lb')).toEqual({
+      abs: '−5 lb',
+      pct: '−2%',
+    });
+  });
+  it('shows zero without a sign', () => {
+    expect(formatChange(100, 100, 'kg', 'kg')).toEqual({ abs: '0 kg', pct: '0%' });
+  });
+  it('does not show negative zero for a tiny drop', () => {
+    expect(formatChange(1000, 999.5, 'count', 'kg').pct).toBe('0%');
+  });
+  it('formats kg with decimals', () => {
+    expect(formatChange(100, 102.5, 'kg', 'kg')).toEqual({ abs: '+2.5 kg', pct: '+3%' });
+  });
+  it('formats counts', () => {
+    expect(formatChange(10, 15, 'count', 'kg')).toEqual({ abs: '+5 reps', pct: '+50%' });
+  });
+  it('formats seconds', () => {
+    expect(formatChange(60, 90, 'seconds', 'kg')).toEqual({ abs: '+0:30', pct: '+50%' });
+  });
+  it('shows an em dash percentage when the first value is 0', () => {
+    expect(formatChange(0, 5, 'count', 'kg')).toEqual({ abs: '+5 reps', pct: '—' });
+  });
+  it('rounds the percentage magnitude symmetrically', () => {
+    expect(formatChange(100, 102.5, 'count', 'kg').pct).toBe('+3%');
+    expect(formatChange(100, 97.5, 'count', 'kg').pct).toBe('−3%');
+  });
+  it('formats volume changes as grouped integers when grouped', () => {
+    expect(formatChange(1000, 2234.6, 'kg', 'kg', { grouped: true })).toEqual({
+      abs: '+1,235 kg',
+      pct: '+123%',
+    });
+    expect(formatChange(lbToKg(5000), lbToKg(3000.4), 'kg', 'lb', { grouped: true }).abs).toBe(
+      '−2,000 lb',
+    );
   });
 });

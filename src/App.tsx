@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { HashRouter, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthGate, ConfigError } from './components/AuthGate';
 import { UpdateToast } from './components/UpdateToast';
+import { ChunkErrorBoundary } from './components/ui/ChunkErrorBoundary';
 import { TabBar } from './components/ui/TabBar';
 import { ToastHost } from './components/ui/Toast';
 import { WorkoutMiniBar } from './components/workout/WorkoutMiniBar';
@@ -11,7 +12,6 @@ import { ExerciseList } from './routes/ExercisesTab/ExerciseList';
 import { HistoryList } from './routes/HistoryTab/HistoryList';
 import { WorkoutDetail } from './routes/HistoryTab/WorkoutDetail';
 import { WorkoutEditor } from './routes/HistoryTab/WorkoutEditor';
-import { ProgressTab } from './routes/ProgressTab';
 import { SettingsPage } from './routes/SettingsPage';
 import { ActiveWorkout } from './routes/WorkoutTab/ActiveWorkout';
 import { Summary } from './routes/WorkoutTab/Summary';
@@ -26,6 +26,10 @@ import { initSettingsStore, useSettingsStore } from './store/settings';
 import { initSyncStore } from './store/sync';
 import { getSyncEngine } from './sync/engine';
 import { startSyncTriggers } from './sync/triggers';
+
+const ProgressTab = lazy(() =>
+  import('./routes/ProgressTab/ProgressTab').then((m) => ({ default: m.ProgressTab })),
+);
 
 function Layout() {
   const { pathname } = useLocation();
@@ -66,7 +70,16 @@ function Shell() {
           <Route path="history" element={<HistoryList />} />
           <Route path="history/:id" element={<WorkoutDetail />} />
           <Route path="history/:id/edit" element={<WorkoutEditor />} />
-          <Route path="progress" element={<ProgressTab />} />
+          <Route
+            path="progress"
+            element={
+              <ChunkErrorBoundary>
+                <Suspense fallback={null}>
+                  <ProgressTab />
+                </Suspense>
+              </ChunkErrorBoundary>
+            }
+          />
           <Route path="exercises" element={<ExerciseList />} />
           <Route path="exercises/new" element={<ExerciseFormPage />} />
           <Route path="exercises/:id" element={<ExerciseDetail />} />
