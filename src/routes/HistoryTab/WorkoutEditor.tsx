@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { Dialog } from '../../components/ui/Dialog';
@@ -73,6 +73,7 @@ export function WorkoutEditor() {
   const [discardOpen, setDiscardOpen] = useState(false);
   const [stage, setStage] = useState<Stage>(CLOSED);
   const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
 
   const startedAt = draft?.startedAt ?? 0;
   const idsKey = [...new Set(draft?.exercises.map((we) => we.exerciseId) ?? [])].sort().join('|');
@@ -149,7 +150,7 @@ export function WorkoutEditor() {
       setFields({ date, time, forStartedAt: draft.startedAt });
       return;
     }
-    setFields({ date, time, forStartedAt: ms });
+    setFields(null);
     useWorkoutEditStore.getState().setStartedAt(ms);
   };
 
@@ -164,6 +165,8 @@ export function WorkoutEditor() {
   };
 
   const run = async (markIncomplete: boolean) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setStage(CLOSED);
     setBusy(true);
     try {
@@ -187,11 +190,12 @@ export function WorkoutEditor() {
     } catch {
       useToastStore.getState().show({ message: SAVE_FAILED });
     }
+    inFlight.current = false;
     setBusy(false);
   };
 
   const begin = () => {
-    if (busy) return;
+    if (inFlight.current) return;
     const current = useWorkoutEditStore.getState();
     if (!current.draft) return;
     if (dateMalformed) return;
@@ -207,6 +211,8 @@ export function WorkoutEditor() {
   };
 
   const remove = async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setStage(CLOSED);
     setBusy(true);
     try {
@@ -215,6 +221,7 @@ export function WorkoutEditor() {
       goList();
     } catch {
       useToastStore.getState().show({ message: SAVE_FAILED });
+      inFlight.current = false;
       setBusy(false);
     }
   };
@@ -233,7 +240,7 @@ export function WorkoutEditor() {
           </Button>
         }
         right={
-          <Button disabled={busy || exerciseMap === null} onClick={begin}>
+          <Button disabled={busy || exerciseMap === null || dateMalformed} onClick={begin}>
             Save
           </Button>
         }

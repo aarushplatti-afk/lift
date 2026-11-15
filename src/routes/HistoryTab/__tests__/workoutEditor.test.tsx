@@ -113,6 +113,21 @@ describe('WorkoutEditor', () => {
     expect(date).toHaveValue('');
   });
 
+  it('shows the normalised time for a DST-gap entry and disables Save while malformed', async () => {
+    const bench = await seedBench();
+    await db.workouts.put(workout(bench, [done(0, 100, 5)]));
+    renderEditor();
+    const date = await screen.findByLabelText('Date');
+    fireEvent.change(date, { target: { value: '2026-03-08' } });
+    fireEvent.change(screen.getByLabelText('Start time'), { target: { value: '02:30' } });
+    await waitFor(() => {
+      expect(screen.getByLabelText('Start time')).toHaveValue('03:30');
+    });
+    fireEvent.change(date, { target: { value: '' } });
+    expect(await screen.findByText('Enter a valid date and time')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+  });
+
   it('resyncs the date and time fields when the draft start changes elsewhere', async () => {
     const bench = await seedBench();
     await db.workouts.put(workout(bench, [done(0, 100, 5)]));
