@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '../../db/schema';
 import { enqueue, recordFailure, runWrite } from '../../db/repos/outbox';
 import { setOwner, wipeLocalData } from '../../db/repos/meta';
@@ -82,6 +82,27 @@ describe('discardFailedChange', () => {
     server.networkDown = true;
     const result = await discardFailedChange(clientWithFetchById(), 'exercises', 'a');
     expect(result).toEqual({ ok: false });
+    expect((await db.exercises.get('a'))?.name).toBe('Local name');
+    expect(await db.syncQueue.count()).toBe(1);
+  });
+
+  it('times out a hung fetch, returns ok false and keeps local state', async () => {
+    await saveFailed('a', 'Local name');
+    const base = clientWithFetchById() as unknown as { auth: object };
+    const hung = {
+      auth: base.auth,
+      from: () => ({
+        select: () => ({ eq: () => ({ maybeSingle: () => new Promise<never>(() => undefined) }) }),
+      }),
+    } as unknown as LiftClient;
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const pending = discardFailedChange(hung, 'exercises', 'a');
+      await vi.advanceTimersByTimeAsync(16_000);
+      expect(await pending).toEqual({ ok: false });
+    } finally {
+      vi.useRealTimers();
+    }
     expect((await db.exercises.get('a'))?.name).toBe('Local name');
     expect(await db.syncQueue.count()).toBe(1);
   });

@@ -48,6 +48,7 @@ export function startSyncTriggers(engine: SyncEngine, auth?: AutoRefresh): () =>
     window.removeEventListener('online', onOnline);
     window.removeEventListener('offline', onOffline);
     clearTimeout(timer);
+    engine.cancelRetry();
     sub.unsubscribe();
   };
 }

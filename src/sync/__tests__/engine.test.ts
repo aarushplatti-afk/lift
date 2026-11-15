@@ -3,6 +3,7 @@ import { db } from '../../db/schema';
 import { enqueue, retryFailed, runWrite } from '../../db/repos/outbox';
 import { getOwner, isInitialPullDone, setOwner, wipeLocalData } from '../../db/repos/meta';
 import type { SyncStatus } from '../../types/sync';
+import { onQuotaExceeded } from '../../lib/storageEvents';
 import { createSyncEngine } from '../engine';
 import { createFakeClient, exerciseRecord, exerciseRow, FakeServer } from './fakeClient';
 
@@ -280,6 +281,91 @@ describe('sync engine', () => {
       await engine.syncNow('offline');
       expect(t.timers.length).toBe(before);
     });
+  });
+
+  describe('retry timer without a usable session', () => {
+    async function armed() {
+      await saveExercise('a');
+      server.failWhen = () => ({ message: 'down', status: 503 });
+      const t = fakeTimers();
+      const engine = makeEngine(t);
+      await engine.syncNow('start');
+      expect(t.timers.filter((x) => !x.cleared)).toHaveLength(1);
+      return { t, engine };
+    }
+
+    it('does not re-arm after the session goes missing', async () => {
+      const { t, engine } = await armed();
+      server.session = null;
+      t.timers[0]?.fn();
+      await vi.waitFor(() => expect(engine.getStatus().lastError).toBe('Not signed in'));
+      await new Promise((r) => setTimeout(r, 20));
+      expect(t.timers).toHaveLength(1);
+    });
+
+    it('does not re-arm when there is no local account for the session', async () => {
+      const { t, engine } = await armed();
+      await db.meta.clear();
+      t.timers[0]?.fn();
+      await vi.waitFor(() =>
+        expect(engine.getStatus().lastError).toBe('No local account for this session'),
+      );
+      await new Promise((r) => setTimeout(r, 20));
+      expect(t.timers).toHaveLength(1);
+    });
+
+    it('does not re-arm after the session expired', async () => {
+      const { t, engine } = await armed();
+      server.failWhen = undefined;
+      server.tokenValid = false;
+      server.refreshMode = 'rejected';
+      t.timers[0]?.fn();
+      await vi.waitFor(() => expect(engine.getStatus().lastError).toMatch(/Session expired/));
+      await new Promise((r) => setTimeout(r, 20));
+      expect(t.timers).toHaveLength(1);
+    });
+
+    it('cancelRetry clears the armed timer', async () => {
+      const { t, engine } = await armed();
+      engine.cancelRetry();
+      expect(t.timers[0]?.cleared).toBe(true);
+    });
+  });
+
+  it('shows offline immediately even while a run is in progress', async () => {
+    await saveExercise('a');
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    server.onUpsert = () => {
+      server.onUpsert = undefined;
+      return gate;
+    };
+    const engine = makeEngine();
+    const run = engine.syncNow('start');
+    await vi.waitFor(() => expect(engine.getStatus().state).toBe('syncing'));
+    online = false;
+    void engine.syncNow('offline');
+    expect(engine.getStatus().state).toBe('offline');
+    release();
+    await run;
+  });
+
+  it('reports a quota error thrown during a run so the quota dialog can open', async () => {
+    const quota = Object.assign(new Error('full'), { name: 'QuotaExceededError' });
+    const client = createFakeClient(server);
+    const failing = {
+      ...client,
+      auth: { getSession: () => Promise.reject(quota) },
+    } as unknown as typeof client;
+    const engine = makeEngine({ client: failing });
+    const seen = vi.fn();
+    const off = onQuotaExceeded(seen);
+    await engine.syncNow('start');
+    off();
+    expect(seen).toHaveBeenCalledTimes(1);
+    expect(engine.getStatus().state).toBe('error');
   });
 
   it('marks a permanent rejection as failed, reports error and does not schedule a retry', async () => {

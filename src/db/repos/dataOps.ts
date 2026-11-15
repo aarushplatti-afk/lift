@@ -146,6 +146,7 @@ export function clearUserDataLocal(userId: string): Promise<void> {
     ],
     async () => {
       await assertOwner(userId);
+      if (await hasActiveWorkout()) throw new DataOpBlockedError('active_workout');
       await Promise.all([
         db.exercises.clear(),
         db.workouts.clear(),

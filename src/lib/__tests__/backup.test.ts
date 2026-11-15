@@ -95,6 +95,84 @@ describe('parseBackup', () => {
     if (again.ok) expect(again.backup).toEqual(original);
   });
 
+  describe('buildBackup placeholders', () => {
+    const META = {
+      userId: OWNER,
+      exportedAt: Date.parse('2026-11-15T00:00:00.000Z'),
+      appVersion: 't',
+    };
+    const ghostId = (n: number): string => `dddddddd-0000-4000-8000-${String(n).padStart(12, '0')}`;
+
+    function withDangling(ids: { workout: string[]; template: string[] }): LiftBackup {
+      const base = valid();
+      const w0 = base.workouts[0];
+      const t0 = base.templates[0];
+      const we = w0?.exercises[0];
+      const te = t0?.exercises[0];
+      if (!w0 || !t0 || !we || !te) throw new Error('fixture');
+      return {
+        ...base,
+        workouts: [
+          {
+            ...w0,
+            exercises: [
+              ...w0.exercises,
+              ...ids.workout.map((exerciseId, i) => ({ ...we, id: `x${i}`, exerciseId })),
+            ],
+          },
+        ],
+        templates: [
+          {
+            ...t0,
+            exercises: [
+              ...t0.exercises,
+              ...ids.template.map((exerciseId) => ({ ...te, exerciseId })),
+            ],
+          },
+        ],
+      };
+    }
+
+    it('synthesises archived placeholders for dangling refs so the backup re-imports', () => {
+      const data = withDangling({ workout: [ghostId(1)], template: [ghostId(2), ghostId(1)] });
+      expect(parseBackup(JSON.stringify(data)).ok).toBe(false);
+      const built = buildBackup(data, META);
+      const ghosts = built.exercises.filter((e) => e.id === ghostId(1) || e.id === ghostId(2));
+      expect(ghosts.map((g) => g.name)).toEqual(['Unknown exercise', 'Unknown exercise 2']);
+      expect(ghosts.every((g) => g.isCustom && g.archived && g.userId === OWNER)).toBe(true);
+      expect(parseBackup(JSON.stringify(built)).ok).toBe(true);
+    });
+
+    it('de-duplicates against an existing exercise already named Unknown exercise', () => {
+      const data = withDangling({ workout: [ghostId(3)], template: [] });
+      const first = data.exercises[0];
+      if (!first) throw new Error('fixture');
+      const named = {
+        ...data,
+        exercises: [{ ...first, name: 'unknown exercise' }, ...data.exercises.slice(1)],
+      };
+      const built = buildBackup(named, META);
+      expect(built.exercises.find((e) => e.id === ghostId(3))?.name).toBe('Unknown exercise 2');
+      expect(parseBackup(JSON.stringify(built)).ok).toBe(true);
+    });
+
+    it('leaves a complete snapshot unchanged', () => {
+      const base = valid();
+      expect(buildBackup(base, META).exercises).toEqual(base.exercises);
+    });
+
+    it('always re-imports across generated snapshots', () => {
+      for (let seed = 1; seed <= 12; seed++) {
+        const count = seed % 5;
+        const wIds = Array.from({ length: count }, (_, i) => ghostId(seed * 10 + i));
+        const tIds = Array.from({ length: seed % 3 }, (_, i) => ghostId(seed * 10 + 5 + (i % 2)));
+        const data = withDangling({ workout: wIds, template: tIds });
+        const result = parseBackup(JSON.stringify(buildBackup(data, META)));
+        expect(result.ok, `seed ${seed}`).toBe(true);
+      }
+    });
+  });
+
   describe('rejects', () => {
     it('non-JSON text', () => {
       expect(parseBackup(notJsonRaw)).toMatchObject({

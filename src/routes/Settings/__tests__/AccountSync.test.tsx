@@ -80,6 +80,7 @@ describe('Account & Sync', () => {
     await userEvent.click(within_dialog('Discard'));
     await waitFor(() => {
       expect(discardFailed).toHaveBeenCalledWith('workouts', 'w1');
+      expect(discardAllFailed).not.toHaveBeenCalled();
     });
   });
 

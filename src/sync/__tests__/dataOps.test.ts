@@ -242,6 +242,58 @@ describe('deleteAllData', () => {
     expect(server.bulkCalls).toHaveLength(0);
   });
 
+  it('re-checks the active workout inside the lock and changes nothing', async () => {
+    await saveLocalExercise('local');
+    const client = createFakeClient(server);
+    const engine = createSyncEngine({
+      client,
+      now: () => NOW,
+      isOnline: () => online,
+      seed: async () => 0,
+    });
+    const realExclusive = engine.runExclusive.bind(engine);
+    engine.runExclusive = async (fn) => {
+      await db.meta.put({ key: 'activeWorkoutId', value: 'w9' });
+      return realExclusive(fn);
+    };
+    const racing = createDataOps({ client, engine, isOnline: () => online, now: () => NOW });
+    expect(await racing.deleteAllData('DELETE')).toMatchObject({
+      ok: false,
+      error: 'active_workout',
+    });
+    expect(server.bulkCalls).toHaveLength(0);
+    expect(await db.exercises.count()).toBe(1);
+    expect(await db.syncQueue.count()).toBe(1);
+  });
+
+  it('maps a hung server call to server_error and leaves local state untouched', async () => {
+    await saveLocalExercise('local');
+    const before = await localState();
+    const client = createFakeClient(server);
+    const hung = {
+      ...client,
+      from: () => ({
+        update: () => ({ eq: () => ({ is: () => new Promise<never>(() => undefined) }) }),
+      }),
+    } as unknown as typeof client;
+    const engine = createSyncEngine({
+      client: hung,
+      now: () => NOW,
+      isOnline: () => online,
+      seed: async () => 0,
+    });
+    const slow = createDataOps({ client: hung, engine, isOnline: () => online, now: () => NOW });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const pending = slow.deleteAllData('DELETE');
+      await vi.advanceTimersByTimeAsync(16_000);
+      expect(await pending).toMatchObject({ ok: false, error: 'server_error' });
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(await localState()).toEqual(before);
+  });
+
   it('tombstones every server row, resets settings and clears local data', async () => {
     server.seed('exercises', [exerciseRow('s1', '2026-01-01T00:00:00.000001+00:00')]);
     server.seed('workouts', [

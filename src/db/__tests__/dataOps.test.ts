@@ -304,7 +304,6 @@ describe('clearUserDataLocal', () => {
     await db.syncState.put({ table: 'workouts', lastPulledAt: 'x', lastPulledKey: null });
     await db.meta.bulkPut([
       { key: 'seedVersion', value: 2 },
-      { key: 'activeWorkoutId', value: 'w1' },
       { key: 'restTimer', value: { workoutId: 'w1', endsAt: 1, durationSec: 60 } },
       { key: 'initialPullDone', value: true },
     ]);
@@ -322,6 +321,13 @@ describe('clearUserDataLocal', () => {
     }
     const keys = (await db.meta.toArray()).map((m) => m.key).sort();
     expect(keys).toEqual(['initialPullDone', 'ownerEmail', 'ownerUserId']);
+  });
+
+  it('throws active_workout inside the transaction and clears nothing', async () => {
+    await db.exercises.put(ex('e1', 'A'));
+    await db.meta.put({ key: 'activeWorkoutId', value: 'w1' });
+    await expect(clearUserDataLocal(U)).rejects.toMatchObject({ reason: 'active_workout' });
+    expect(await db.exercises.count()).toBe(1);
   });
 
   it('is a no-op error for the wrong owner', async () => {

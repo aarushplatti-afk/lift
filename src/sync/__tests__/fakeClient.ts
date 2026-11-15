@@ -29,6 +29,7 @@ export class FakeServer {
   clock = '2026-01-01T00:00:00.000000+00:00';
   networkDown = false;
   failWhen: ((table: SyncTable, rows: Row[]) => string | FailSpec | null) | undefined;
+  failUpdate: FailSpec | undefined;
   upsertCalls: { table: SyncTable; rows: Row[]; onConflict: string }[] = [];
   updateCalls: { table: SyncTable; values: Record<string, unknown>; ids: string[] }[] = [];
   bulkCalls: { table: SyncTable; userId: string }[] = [];
@@ -127,6 +128,14 @@ export class FakeServer {
     this.updateCalls.push({ table, values, ids });
     const down = this.fail();
     if (down) return down;
+    if (this.failUpdate) {
+      const { message, code, status } = this.failUpdate;
+      return {
+        data: null,
+        error: code ? { message, code } : { message },
+        ...(status === undefined ? {} : { status }),
+      };
+    }
     for (const row of this.tables[table]) {
       if (ids.includes(String(row.id))) Object.assign(row, values, { updated_at: this.clock });
     }

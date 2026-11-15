@@ -163,11 +163,11 @@ export function FailedChangesList() {
             fullWidth
             disabled={busy}
             onClick={() => {
-              void run(() =>
-                confirm === 'all' || target === null
-                  ? discardAllFailed()
-                  : discardFailed(target.table, target.recordId),
-              );
+              if (confirm === 'all') {
+                void run(() => discardAllFailed());
+              } else if (target !== null) {
+                void run(() => discardFailed(target.table, target.recordId));
+              }
             }}
           >
             {busy ? 'Working…' : 'Discard'}

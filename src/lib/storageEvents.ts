@@ -13,3 +13,9 @@ export function onQuotaExceeded(cb: () => void): () => void {
     listeners.delete(cb);
   };
 }
+
+export function installStorageErrorListener(): () => void {
+  const onRejection = (e: PromiseRejectionEvent): void => reportStorageError(e.reason);
+  window.addEventListener('unhandledrejection', onRejection);
+  return () => window.removeEventListener('unhandledrejection', onRejection);
+}

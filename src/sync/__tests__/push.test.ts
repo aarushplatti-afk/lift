@@ -169,6 +169,20 @@ describe('pushOutbox', () => {
     expect(server.upsertCalls).toHaveLength(0);
   });
 
+  it('stops the pass at a retryable failure so later runs are not sent', async () => {
+    await removeExercise('a');
+    await saveExercise(exerciseRecord('b'));
+    server.failUpdate = { message: 'upstream', status: 503 };
+    const now = Date.now();
+    const res = await push(createFakeClient(server), { now, force: false });
+    expect(res).toEqual({ pushed: 0, failed: 1, offline: false, authExpired: false });
+    expect(server.upsertCalls).toHaveLength(0);
+    const left = await db.syncQueue.toArray();
+    expect(left).toHaveLength(2);
+    expect(left.find((e) => e.recordId === 'a')).toMatchObject({ attempts: 1, state: 'pending' });
+    expect(left.find((e) => e.recordId === 'b')).toMatchObject({ attempts: 0, state: 'pending' });
+  });
+
   it('never retries a failed entry, forced or not', async () => {
     await saveExercise(exerciseRecord('bad'));
     server.failWhen = () => ({ message: 'rls', code: '42501', status: 403 });

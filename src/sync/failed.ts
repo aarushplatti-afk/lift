@@ -7,6 +7,9 @@ import { createAuthRetry } from './authRetry';
 import { fromRow } from './mappers';
 import { isNetworkError, OfflineError } from './push';
 import { SyncRequestError } from './retry';
+import { TIMED_OUT, withTimeout } from './timeout';
+
+const DISCARD_FETCH_TIMEOUT_MS = 15_000;
 
 interface FetchResult {
   data: object | null;
@@ -33,10 +36,13 @@ export async function discardFailedChange(
   const authRetry = createAuthRetry(client);
   try {
     const result = await authRetry(async () => {
-      const res = await (client.from(table) as unknown as LooseFetch)
-        .select('*')
-        .eq(keyCol, key)
-        .maybeSingle();
+      const res = await withTimeout(
+        Promise.resolve(
+          (client.from(table) as unknown as LooseFetch).select('*').eq(keyCol, key).maybeSingle(),
+        ),
+        DISCARD_FETCH_TIMEOUT_MS,
+      );
+      if (res === TIMED_OUT) throw new OfflineError('timeout');
       if (res.error) {
         if (isNetworkError(res.error.message)) throw new OfflineError('offline');
         throw new SyncRequestError(res.error.message, res.status, res.error.code);

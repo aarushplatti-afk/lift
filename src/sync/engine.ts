@@ -6,6 +6,7 @@ import {
   OwnerChangedError,
   setInitialPullDone,
 } from '../db/repos/meta';
+import { reportStorageError } from '../lib/storageEvents';
 import { getSupabase, type LiftClient } from '../lib/supabase';
 import type { SyncStatus } from '../types/sync';
 import { pullAll } from './pull';
@@ -26,6 +27,7 @@ export interface SyncEngine {
   subscribe(cb: (s: SyncStatus) => void): () => void;
   getStatus(): SyncStatus;
   runExclusive<T>(fn: () => Promise<T>): Promise<T>;
+  cancelRetry(): void;
 }
 
 interface EngineDeps {
@@ -48,6 +50,7 @@ export function createSyncEngine(deps: EngineDeps): SyncEngine {
   let retryTimer: unknown;
   let exclusiveCount = 0;
   let exclusiveTail: Promise<unknown> = Promise.resolve();
+  let reachedPush = false;
   let deferred = false;
   let deferredForce = false;
   const setTimer = deps.setTimer ?? ((fn: () => void, ms: number) => setTimeout(fn, ms));
@@ -89,6 +92,7 @@ export function createSyncEngine(deps: EngineDeps): SyncEngine {
       return;
     }
     const previousState = status.state;
+    reachedPush = false;
     setStatus({ state: 'syncing', lastError: undefined });
     try {
       const sessionResult = await withTimeout(client.auth.getSession(), AUTH_TIMEOUT_MS);
@@ -113,6 +117,7 @@ export function createSyncEngine(deps: EngineDeps): SyncEngine {
         sessionExpired();
         return;
       }
+      reachedPush = true;
       if (pushed.offline) {
         setStatus({ state: 'offline' });
         return;
@@ -154,6 +159,7 @@ export function createSyncEngine(deps: EngineDeps): SyncEngine {
         setStatus({ state: 'synced', lastSyncedAt: now() });
       }
     } catch (err) {
+      reportStorageError(err);
       if (err instanceof OwnerChangedError) {
         setStatus({ state: previousState });
         return;
@@ -185,7 +191,7 @@ export function createSyncEngine(deps: EngineDeps): SyncEngine {
   }
 
   async function scheduleRetry(): Promise<void> {
-    if (!isOnline() || exclusiveCount > 0) return;
+    if (!reachedPush || !isOnline() || exclusiveCount > 0) return;
     if (status.state === 'offline' || status.lastError === SESSION_EXPIRED) return;
     const due = await nextDueAt();
     if (due === undefined || retryTimer !== undefined) return;
@@ -216,6 +222,7 @@ export function createSyncEngine(deps: EngineDeps): SyncEngine {
 
   const engine: SyncEngine = {
     syncNow(reason) {
+      if (!isOnline() || reason === 'offline') setStatus({ state: 'offline' });
       if (exclusiveCount > 0) {
         deferred = true;
         if (reason === 'manual') deferredForce = true;
@@ -255,6 +262,7 @@ export function createSyncEngine(deps: EngineDeps): SyncEngine {
         }
       })();
     },
+    cancelRetry,
     subscribe(cb) {
       listeners.add(cb);
       if (!countsSub) startCounts();

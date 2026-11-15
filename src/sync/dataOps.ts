@@ -19,6 +19,7 @@ import { SyncRequestError } from './retry';
 import { TIMED_OUT, withTimeout } from './timeout';
 
 const EXPORT_SYNC_CAP_MS = 10_000;
+const TOMBSTONE_TIMEOUT_MS = 15_000;
 const DELETE_CONFIRM_TEXT = 'DELETE';
 const TOMBSTONE_TABLES = ['workouts', 'templates', 'bodyweight_entries', 'exercises'] as const;
 
@@ -72,7 +73,9 @@ function failure(error: DataOpError): { ok: false; error: DataOpError; message: 
 }
 
 async function assertWrite(result: PromiseLike<WriteResult>): Promise<void> {
-  const { error, status } = await result;
+  const settled = await withTimeout(Promise.resolve(result), TOMBSTONE_TIMEOUT_MS);
+  if (settled === TIMED_OUT) throw new SyncRequestError('Request timed out');
+  const { error, status } = settled;
   if (error) throw new SyncRequestError(error.message, status, error.code);
 }
 
@@ -177,6 +180,7 @@ export function createDataOps(deps: {
       if (blocked) return failure(blocked);
       try {
         await engine.runExclusive(async () => {
+          await assertNoActiveWorkout();
           try {
             await tombstoneServer(owner.userId);
           } catch {

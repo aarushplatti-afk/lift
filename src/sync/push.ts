@@ -93,7 +93,7 @@ export async function pushOutbox(
   }
 
   try {
-    for (const run of runs) {
+    runLoop: for (const run of runs) {
       try {
         await send(run);
         await removeEntries(entryIdsOf(run));
@@ -102,13 +102,13 @@ export async function pushOutbox(
       } catch (err) {
         if (isStop(err)) throw err;
         if (run.length === 1) {
-          await fail(run, err);
+          if ((await fail(run, err)) === 'retryable') break runLoop;
           continue;
         }
         const duplicate = err instanceof SyncRequestError && err.code === '23505';
         if (!duplicate && classifyError(err, maxAttempts(run)) === 'retryable') {
           await fail(run, err);
-          continue;
+          break runLoop;
         }
       }
       for (const op of run) {
@@ -118,7 +118,7 @@ export async function pushOutbox(
           pushed += 1;
         } catch (err) {
           if (isStop(err)) throw err;
-          await fail([op], err);
+          if ((await fail([op], err)) === 'retryable') break runLoop;
         }
       }
     }

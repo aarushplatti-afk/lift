@@ -285,17 +285,54 @@ export const backupSchema: z.ZodType<LiftBackup> = z
     crossChecks(b, ctx);
   });
 
+const PLACEHOLDER_NAME = 'Unknown exercise';
+
+function placeholderExercises(
+  data: BackupData,
+  meta: { userId: string; exportedAt: number },
+): Exercise[] {
+  const known = new Set(data.exercises.map((e) => e.id));
+  const taken = new Set(data.exercises.map((e) => nameKey(e.name)));
+  const missing: string[] = [];
+  const note = (id: string): void => {
+    if (known.has(id)) return;
+    known.add(id);
+    missing.push(id);
+  };
+  for (const w of data.workouts) for (const we of w.exercises) note(we.exerciseId);
+  for (const t of data.templates) for (const te of t.exercises) note(te.exerciseId);
+
+  return missing.map((id) => {
+    let name = PLACEHOLDER_NAME;
+    for (let n = 2; taken.has(nameKey(name)); n++) name = `${PLACEHOLDER_NAME} ${n}`;
+    taken.add(nameKey(name));
+    return {
+      id,
+      userId: meta.userId,
+      updatedAt: meta.exportedAt,
+      name,
+      muscleGroup: 'other',
+      equipment: 'other',
+      type: 'weight_reps',
+      isCustom: true,
+      archived: true,
+      createdAt: meta.exportedAt,
+    };
+  });
+}
+
 export function buildBackup(
   data: BackupData,
   meta: { userId: string; exportedAt: number; appVersion: string },
 ): LiftBackup {
+  const placeholders = placeholderExercises(data, meta);
   return {
     format: BACKUP_FORMAT,
     schemaVersion: BACKUP_SCHEMA_VERSION,
     exportedAt: new Date(meta.exportedAt).toISOString(),
     appVersion: meta.appVersion,
     userId: meta.userId,
-    exercises: data.exercises,
+    exercises: placeholders.length === 0 ? data.exercises : [...data.exercises, ...placeholders],
     workouts: data.workouts,
     templates: data.templates,
     bodyweight: data.bodyweight,
