@@ -192,6 +192,31 @@ export async function readRemoteTemplates(user: TestUser): Promise<RemoteTemplat
   return data as RemoteTemplate[];
 }
 
+export interface RemoteBodyweight {
+  id: string;
+  entry_date: string;
+  weight_kg: number;
+  note: string | null;
+  deleted_at: string | null;
+}
+
+/** Reads every bodyweight_entries row (including soft-deleted) for the user via a second signed-in client. */
+export async function readRemoteBodyweight(user: TestUser): Promise<RemoteBodyweight[]> {
+  const client = anonClient();
+  const { error: signInError } = await client.auth.signInWithPassword({
+    email: user.email,
+    password: user.password,
+  });
+  if (signInError) throw new Error(`second client sign-in failed: ${signInError.message}`);
+  const { data, error } = await client
+    .from('bodyweight_entries')
+    .select('id,entry_date,weight_kg,note,deleted_at')
+    .eq('user_id', user.id)
+    .limit(5000);
+  if (error) throw new Error(`bodyweight read failed: ${error.message}`);
+  return (data as RemoteBodyweight[]).map((r) => ({ ...r, weight_kg: Number(r.weight_kg) }));
+}
+
 export interface RemoteWorkoutInsert {
   id: string;
   name: string;

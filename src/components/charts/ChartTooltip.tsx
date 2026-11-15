@@ -1,22 +1,17 @@
-import type { ChartDatum } from './LineChart';
-
 export interface TooltipText {
   title: string;
   value: string;
   detail?: string;
 }
 
-interface ChartTooltipProps {
+interface ChartTooltipProps<D> {
   active?: boolean;
   payload?: readonly { payload?: unknown }[];
-  render: (d: ChartDatum) => TooltipText;
+  isDatum: (v: unknown) => v is D;
+  render: (d: D) => TooltipText;
 }
 
-function isDatum(v: unknown): v is ChartDatum {
-  return typeof v === 'object' && v !== null && 't' in v && 'y' in v && 'point' in v;
-}
-
-export function ChartTooltip({ active, payload, render }: ChartTooltipProps) {
+export function ChartTooltip<D>({ active, payload, isDatum, render }: ChartTooltipProps<D>) {
   const first = payload?.[0]?.payload;
   if (!active || !isDatum(first)) return null;
   const text = render(first);

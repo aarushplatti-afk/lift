@@ -116,6 +116,31 @@ describe('applyServerRecords', () => {
     expect(rows[0]).toMatchObject({ id: 'server', weightKg: 81 });
   });
 
+  it('bodyweight tombstone is skipped while a local re-log is pending', async () => {
+    await runWrite(['bodyweight_entries'], async () => {
+      await db.bodyweight.put(bw('a', '2026-01-01', 79));
+      await enqueue('bodyweight_entries', 'a', 'upsert', bw('a', '2026-01-01', 79));
+    });
+    const r = await applyServerRecords(
+      'bodyweight_entries',
+      [{ record: bw('a', '2026-01-01', 80), deleted: true }],
+      'u1',
+    );
+    expect(r).toEqual({ applied: 0, skipped: 1 });
+    expect((await db.bodyweight.get('a'))?.weightKg).toBe(79);
+  });
+
+  it('bodyweight tombstone with nothing pending deletes the local row', async () => {
+    await db.bodyweight.put(bw('a', '2026-01-01'));
+    const r = await applyServerRecords(
+      'bodyweight_entries',
+      [{ record: bw('a', '2026-01-01'), deleted: true }],
+      'u1',
+    );
+    expect(r.applied).toBe(1);
+    expect(await db.bodyweight.count()).toBe(0);
+  });
+
   it('bodyweight same id and date updates in place', async () => {
     await db.bodyweight.put(bw('a', '2026-01-01', 80));
     await applyServerRecords(

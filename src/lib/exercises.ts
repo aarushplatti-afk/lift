@@ -1,4 +1,4 @@
-import type { TrainedExercise } from './calc/records';
+import type { ExerciseRecords, TrainedExercise } from './calc/records';
 import type { Equipment, Exercise, ExerciseType, MuscleGroup } from '../types/domain';
 
 export const NAME_MAX = 60;
@@ -102,4 +102,21 @@ export function selectorSections(
     .filter((e) => !e.archived && !trainedIds.has(e.id) && matchesQuery(e.name, query))
     .sort(byName);
   return { trained: trainedList, others };
+}
+
+export function prGroups(
+  exercises: ReadonlyMap<string, Exercise>,
+  records: ReadonlyMap<string, ExerciseRecords>,
+  query: string,
+  muscle: MuscleGroup | 'all',
+): { exercise: Exercise; records: ExerciseRecords }[] {
+  const groups: { exercise: Exercise; records: ExerciseRecords }[] = [];
+  for (const exercise of exercises.values()) {
+    const recs = records.get(exercise.id);
+    if (recs === undefined || Object.keys(recs).length === 0) continue;
+    if (muscle !== 'all' && exercise.muscleGroup !== muscle) continue;
+    if (!matchesQuery(exercise.name, query)) continue;
+    groups.push({ exercise, records: recs });
+  }
+  return groups.sort((a, b) => byName(a.exercise, b.exercise));
 }

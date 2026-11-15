@@ -5,6 +5,7 @@ import { xDomain, yAxis } from '../../lib/calc/axis';
 import type { Point } from '../../lib/calc/series';
 import { ChartTooltip } from './ChartTooltip';
 import type { TooltipText } from './ChartTooltip';
+import { formatTick, prefersReducedMotion, xTicks, Y_AXIS_WIDTH } from './chartAxis';
 import './chart.css';
 
 export interface ChartDatum {
@@ -22,26 +23,8 @@ export interface LineChartProps {
   ariaLabel: string;
 }
 
-const YEAR_MS = 365 * 86_400_000;
-const Y_AXIS_WIDTH = 48;
-
-function prefersReducedMotion(): boolean {
-  return (
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  );
-}
-
-function xTicks([lo, hi]: [number, number]): number[] {
-  const count = hi - lo > 2 * 86_400_000 ? 4 : 3;
-  return Array.from({ length: count }, (_, i) => Math.round(lo + ((hi - lo) * i) / (count - 1)));
-}
-
-function formatTick(t: number, spanMs: number): string {
-  const d = new Date(t);
-  if (spanMs <= YEAR_MS) return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  const month = d.toLocaleDateString('en-US', { month: 'short' });
-  return `${month} ’${String(d.getFullYear()).slice(-2)}`;
+function isDatum(v: unknown): v is ChartDatum {
+  return typeof v === 'object' && v !== null && 't' in v && 'y' in v && 'point' in v;
 }
 
 export function LineChart({
@@ -103,7 +86,12 @@ export function LineChart({
           <Tooltip
             cursor
             content={(p) => (
-              <ChartTooltip active={p.active} payload={p.payload} render={renderTooltip} />
+              <ChartTooltip
+                active={p.active}
+                payload={p.payload}
+                isDatum={isDatum}
+                render={renderTooltip}
+              />
             )}
           />
           <Line

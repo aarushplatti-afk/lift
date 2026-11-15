@@ -23,6 +23,31 @@
   stroke-width: 1px;
 }
 
+.lift-chart .lift-bw-raw .recharts-line-curve {
+  stroke: none;
+}
+
+.lift-chart .lift-bw-raw-dot {
+  fill: rgb(var(--color-text-secondary) / 0.7);
+  stroke: rgb(var(--color-surface));
+  stroke-width: 1px;
+}
+
+.lift-chart .lift-bw-trend .recharts-line-curve {
+  stroke: rgb(var(--color-accent));
+  stroke-width: 3px;
+}
+
+.lift-chart .lift-bw-goal line {
+  stroke: rgb(var(--color-text-secondary));
+  stroke-width: 1.5px;
+}
+
+.lift-chart .lift-bw-goal-label {
+  fill: rgb(var(--color-text-secondary));
+  font-size: 12px;
+}
+
 .lift-chart .recharts-tooltip-cursor {
   stroke: rgb(var(--color-text-secondary) / 0.6);
 }

@@ -1,6 +1,6 @@
 import type { ExerciseType, Workout, WorkoutSet } from '../../types/domain';
 import { setE1rm } from './e1rm';
-import { isWorkingSet, round4, setVolume } from './volume';
+import { isWorkingSet, round4, setVolume, type ExerciseTypes } from './volume';
 
 export interface RecordEntry {
   value: number;
@@ -28,27 +28,42 @@ function compareWorkouts(a: Workout, b: Workout): number {
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 
+function offerRecord(
+  records: ExerciseRecords,
+  key: keyof ExerciseRecords,
+  raw: number | undefined,
+  w: Workout,
+  set: WorkoutSet,
+): void {
+  if (raw === undefined) return;
+  const value = round4(raw);
+  if (value <= 0) return;
+  const current = records[key];
+  if (current === undefined || value > current.value) {
+    records[key] = { value, workoutId: w.id, startedAt: w.startedAt, set };
+  }
+}
+
+function offerSet(records: ExerciseRecords, type: ExerciseType, w: Workout, s: WorkoutSet): void {
+  if (!isWorkingSet(s, type)) return;
+  if (type === 'weight_reps' || type === 'weighted_bodyweight') {
+    offerRecord(records, 'weight', s.weightKg, w, s);
+    offerRecord(records, 'e1rm', setE1rm(s, type), w, s);
+    offerRecord(records, 'setVolume', setVolume(s, type), w, s);
+    if (type === 'weighted_bodyweight') offerRecord(records, 'reps', s.reps, w, s);
+  } else if (type === 'bodyweight_reps') {
+    offerRecord(records, 'reps', s.reps, w, s);
+  } else {
+    offerRecord(records, 'duration', s.durationSec, w, s);
+  }
+}
+
 export function exerciseRecords(
   exerciseId: string,
   workouts: readonly Workout[],
   type: ExerciseType,
 ): ExerciseRecords {
   const records: ExerciseRecords = {};
-  const offer = (
-    key: keyof ExerciseRecords,
-    raw: number | undefined,
-    w: Workout,
-    set: WorkoutSet,
-  ): void => {
-    if (raw === undefined) return;
-    const value = round4(raw);
-    if (value <= 0) return;
-    const current = records[key];
-    if (current === undefined || value > current.value) {
-      records[key] = { value, workoutId: w.id, startedAt: w.startedAt, set };
-    }
-  };
-  const kgType = type === 'weight_reps' || type === 'weighted_bodyweight';
   const completed = workouts.filter((w) => w.status === 'completed').sort(compareWorkouts);
   for (const w of completed) {
     const blocks = w.exercises
@@ -56,22 +71,38 @@ export function exerciseRecords(
       .sort((a, b) => a.order - b.order);
     for (const we of blocks) {
       const sets = [...we.sets].sort((a, b) => a.order - b.order);
-      for (const s of sets) {
-        if (!isWorkingSet(s, type)) continue;
-        if (kgType) {
-          offer('weight', s.weightKg, w, s);
-          offer('e1rm', setE1rm(s, type), w, s);
-          offer('setVolume', setVolume(s, type), w, s);
-          if (type === 'weighted_bodyweight') offer('reps', s.reps, w, s);
-        } else if (type === 'bodyweight_reps') {
-          offer('reps', s.reps, w, s);
-        } else {
-          offer('duration', s.durationSec, w, s);
-        }
-      }
+      for (const s of sets) offerSet(records, type, w, s);
     }
   }
   return records;
+}
+
+/**
+ * Records for every exercise present in `types`, computed in one pass over the
+ * completed workouts. Exercises with no qualifying set are absent from the map.
+ */
+export function recordsByExercise(
+  workouts: readonly Workout[],
+  types: ExerciseTypes,
+): Map<string, ExerciseRecords> {
+  const result = new Map<string, ExerciseRecords>();
+  const completed = workouts.filter((w) => w.status === 'completed').sort(compareWorkouts);
+  for (const w of completed) {
+    const blocks = [...w.exercises].sort((a, b) => a.order - b.order);
+    for (const we of blocks) {
+      const type = types.get(we.exerciseId);
+      if (type === undefined) continue;
+      const sets = [...we.sets].sort((a, b) => a.order - b.order);
+      for (const s of sets) {
+        let records = result.get(we.exerciseId);
+        const fresh = records === undefined;
+        if (records === undefined) records = {};
+        offerSet(records, type, w, s);
+        if (fresh && Object.keys(records).length > 0) result.set(we.exerciseId, records);
+      }
+    }
+  }
+  return result;
 }
 
 function isBetter(a: WorkoutSet, b: WorkoutSet, type: ExerciseType): boolean {

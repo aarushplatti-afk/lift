@@ -6,11 +6,13 @@ import {
   groupByInitial,
   matchesQuery,
   nameKey,
+  prGroups,
   selectorSections,
   normalizeName,
   searchKey,
 } from '../exercises';
-import type { Exercise } from '../../types/domain';
+import type { ExerciseRecords } from '../calc/records';
+import type { Exercise, MuscleGroup } from '../../types/domain';
 
 function ex(name: string): Exercise {
   return {
@@ -124,5 +126,68 @@ describe('selectorSections', () => {
 
   it('handles empty inputs', () => {
     expect(selectorSections([], [], '')).toEqual({ trained: [], others: [] });
+  });
+});
+
+describe('prGroups', () => {
+  const rec: ExerciseRecords = {
+    weight: {
+      value: 1,
+      workoutId: 'w',
+      startedAt: 0,
+      set: { id: 's', order: 0, type: 'normal', completed: true },
+    },
+  };
+  function build(
+    specs: { name: string; muscle?: MuscleGroup; archived?: boolean; empty?: boolean }[],
+  ) {
+    const exercises = new Map<string, Exercise>();
+    const records = new Map<string, ExerciseRecords>();
+    for (const sp of specs) {
+      exercises.set(sp.name, {
+        ...ex(sp.name),
+        muscleGroup: sp.muscle ?? 'chest',
+        archived: sp.archived ?? false,
+      });
+      if (sp.empty !== true) records.set(sp.name, rec);
+    }
+    return { exercises, records };
+  }
+
+  it('sorts with the collator (numeric, case-insensitive)', () => {
+    const { exercises, records } = build([
+      { name: 'Row 10' },
+      { name: 'row 2' },
+      { name: 'Bench' },
+    ]);
+    const names = prGroups(exercises, records, '', 'all').map((g) => g.exercise.name);
+    expect(names).toEqual(['Bench', 'row 2', 'Row 10']);
+  });
+
+  it('filters by query and muscle', () => {
+    const { exercises, records } = build([
+      { name: 'Bench Press' },
+      { name: 'Back Squat', muscle: 'quads' },
+      { name: 'Squat Jump', muscle: 'quads' },
+    ]);
+    expect(prGroups(exercises, records, 'squat', 'all')).toHaveLength(2);
+    expect(prGroups(exercises, records, 'squat', 'chest')).toHaveLength(0);
+    expect(prGroups(exercises, records, '', 'quads')).toHaveLength(2);
+    expect(prGroups(exercises, records, 'BENCH', 'chest')).toHaveLength(1);
+  });
+
+  it('includes archived exercises and excludes ones without records', () => {
+    const { exercises, records } = build([
+      { name: 'Old', archived: true },
+      { name: 'Never done', empty: true },
+      { name: 'Zero' },
+    ]);
+    records.set('Zero', {});
+    const names = prGroups(exercises, records, '', 'all').map((g) => g.exercise.name);
+    expect(names).toEqual(['Old']);
+  });
+
+  it('returns empty for empty input', () => {
+    expect(prGroups(new Map(), new Map(), '', 'all')).toEqual([]);
   });
 });

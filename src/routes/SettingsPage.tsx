@@ -11,6 +11,7 @@ import { SegmentedControl } from '../components/ui/SegmentedControl';
 import { Stepper } from '../components/ui/Stepper';
 import { Toggle } from '../components/ui/Toggle';
 import { useToastStore } from '../components/ui/toastStore';
+import { GoalWeightField } from './Settings/GoalWeightField';
 import { REST_MAX_SEC, REST_MIN_SEC, REST_STEP_SEC } from '../lib/calc/rest';
 import { formatDurationInput } from '../lib/duration';
 import { formatWeight } from '../lib/format';
@@ -201,6 +202,16 @@ export function SettingsPage() {
             checked={settings.keepScreenAwakeDuringWorkout}
             onChange={(keepScreenAwakeDuringWorkout) => {
               saveSetting({ keepScreenAwakeDuringWorkout });
+            }}
+          />
+        </Section>
+
+        <Section title="Bodyweight">
+          <GoalWeightField
+            goalKg={settings.bodyweightGoalKg}
+            unit={settings.unit}
+            onSave={(bodyweightGoalKg) => {
+              saveSetting({ bodyweightGoalKg });
             }}
           />
         </Section>

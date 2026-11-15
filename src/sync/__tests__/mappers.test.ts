@@ -114,6 +114,20 @@ describe('mappers', () => {
     expect(back.record).toEqual({ ...rec, weightKg: 80.123 });
   });
 
+  it('bodyweight toRow always sends deleted_at null so a re-log revives a tombstone', () => {
+    const row = toRow('bodyweight_entries', {
+      id: 'b1',
+      userId: 'u1',
+      date: '2026-01-02',
+      weightKg: 80.9206,
+      createdAt: 5,
+      updatedAt: 6,
+    });
+    expect(row.deleted_at).toBeNull();
+    expect(row.weight_kg).toBe(80.921);
+    expect(row.note).toBeNull();
+  });
+
   it('user_settings maps to { user_id, data } and merges defaults on read', () => {
     const rec: Settings = {
       ...DEFAULT_SETTINGS,
