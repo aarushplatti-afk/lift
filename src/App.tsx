@@ -8,7 +8,9 @@ import { WorkoutMiniBar } from './components/workout/WorkoutMiniBar';
 import { ExerciseDetail } from './routes/ExercisesTab/ExerciseDetail';
 import { ExerciseFormPage } from './routes/ExercisesTab/ExerciseFormPage';
 import { ExerciseList } from './routes/ExercisesTab/ExerciseList';
-import { HistoryTab } from './routes/HistoryTab';
+import { HistoryList } from './routes/HistoryTab/HistoryList';
+import { WorkoutDetail } from './routes/HistoryTab/WorkoutDetail';
+import { WorkoutEditor } from './routes/HistoryTab/WorkoutEditor';
 import { ProgressTab } from './routes/ProgressTab';
 import { SettingsPage } from './routes/SettingsPage';
 import { ActiveWorkout } from './routes/WorkoutTab/ActiveWorkout';
@@ -34,7 +36,8 @@ function Layout() {
     !pathname.startsWith('/templates/') &&
     pathname !== '/settings' &&
     pathname !== '/exercises/new' &&
-    !/^\/exercises\/[^/]+\/edit$/.test(pathname);
+    !/^\/exercises\/[^/]+\/edit$/.test(pathname) &&
+    !/^\/history\/[^/]+\/edit$/.test(pathname);
   const showMiniBar = showTabs && workoutActive && pathname !== '/';
   const padding = !showTabs
     ? 'pb-safe'
@@ -60,7 +63,9 @@ function Shell() {
           <Route path="workout/summary/:id" element={<Summary />} />
           <Route path="templates/new" element={<TemplateEditor />} />
           <Route path="templates/:id/edit" element={<TemplateEditor />} />
-          <Route path="history" element={<HistoryTab />} />
+          <Route path="history" element={<HistoryList />} />
+          <Route path="history/:id" element={<WorkoutDetail />} />
+          <Route path="history/:id/edit" element={<WorkoutEditor />} />
           <Route path="progress" element={<ProgressTab />} />
           <Route path="exercises" element={<ExerciseList />} />
           <Route path="exercises/new" element={<ExerciseFormPage />} />
