@@ -5,17 +5,16 @@ import { SegmentedControl } from '../components/ui/SegmentedControl';
 import { Stepper } from '../components/ui/Stepper';
 import { Toggle } from '../components/ui/Toggle';
 import { useToastStore } from '../components/ui/toastStore';
+import { AboutSection } from './Settings/AboutSection';
 import { AccountSyncSection } from './Settings/AccountSyncSection';
 import { DataSection } from './Settings/DataSection';
 import { GoalWeightField } from './Settings/GoalWeightField';
-import { Row, Section } from './Settings/Section';
-import { StorageRows } from './Settings/StorageRows';
+import { Section } from './Settings/Section';
 import { REST_MAX_SEC, REST_MIN_SEC, REST_STEP_SEC } from '../lib/calc/rest';
 import { formatDurationInput } from '../lib/duration';
 import { formatWeight } from '../lib/format';
 import { isVibrationSupported } from '../lib/platform/haptics';
 import { isWakeLockSupported } from '../lib/platform/wakeLock';
-import { APP_VERSION } from '../lib/version';
 import { useSettingsStore } from '../store/settings';
 import type { ThemePref, Unit } from '../types/domain';
 
@@ -158,11 +157,7 @@ export function SettingsPage() {
 
         <DataSection />
 
-        <Section title="About">
-          <Row label="App" value="Lift" />
-          <Row label="Version" value={APP_VERSION} />
-          <StorageRows />
-        </Section>
+        <AboutSection />
       </div>
     </>
   );

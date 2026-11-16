@@ -6,7 +6,12 @@ import { EmptyState } from '../../../components/ui/EmptyState';
 import { IconButton } from '../../../components/ui/IconButton';
 import { useToastStore } from '../../../components/ui/toastStore';
 import { WorkoutInProgressDialog } from '../../../components/workout/WorkoutInProgressDialog';
-import { deleteTemplate, duplicateTemplate, listTemplates } from '../../../db/repos/templates';
+import {
+  addStarterTemplates,
+  deleteTemplate,
+  duplicateTemplate,
+  listTemplates,
+} from '../../../db/repos/templates';
 import { useLiveQuery } from '../../../hooks/useLiveQuery';
 import { useNow } from '../../../hooks/useNow';
 import { formatLastUsed } from '../../../lib/format';
@@ -81,6 +86,17 @@ export function TemplateList() {
     }
   };
 
+  const handleAddStarters = async () => {
+    try {
+      const added = await addStarterTemplates();
+      useToastStore.getState().show({
+        message: added > 0 ? 'Starter templates added' : 'Starter exercises not found',
+      });
+    } catch {
+      useToastStore.getState().show({ message: SAVE_FAILED });
+    }
+  };
+
   const goNew = () => {
     navigate('/templates/new');
   };
@@ -99,7 +115,19 @@ export function TemplateList() {
         <EmptyState
           title="No templates yet"
           description="Save a routine you repeat, like Push Day, and start it in one tap."
-          action={<Button onClick={goNew}>Create template</Button>}
+          action={
+            <div className="flex flex-col gap-2">
+              <Button onClick={goNew}>Create template</Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  void handleAddStarters();
+                }}
+              >
+                Add starter templates
+              </Button>
+            </div>
+          }
         />
       )}
       {templates !== null && templates.length > 0 && (
