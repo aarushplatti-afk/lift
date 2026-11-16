@@ -170,7 +170,7 @@ export async function signOut(opts: { discardUnsynced: boolean }): Promise<SignO
   }
   getSyncEngine().cancelRetry();
   const { error } = await getSupabase().auth.signOut({ scope: 'local' });
-  if (error) console.error('Supabase signOut failed; clearing local data anyway', error.message);
+  if (error) console.warn('Supabase signOut failed; clearing local data anyway', error.message);
   await withSyncLock(wipeLocalData);
   emit(null);
   return { ok: true };
