@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 test('app shell loads offline after service worker is ready', async ({ page, context }) => {
   await page.goto('./');

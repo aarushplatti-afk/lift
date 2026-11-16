@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { expect, test } from '../fixtures';
 import { createUser, hasSupabase, SKIP_REASON, signInUi } from './helpers';
 
 test.skip(!hasSupabase, SKIP_REASON);
@@ -22,7 +23,10 @@ function bar(page: Page) {
 }
 
 async function barSeconds(page: Page): Promise<number> {
-  const text = (await bar(page).getByText(/^\d+:\d\d$/).textContent()) ?? '';
+  const text =
+    (await bar(page)
+      .getByText(/^\d+:\d\d$/)
+      .textContent()) ?? '';
   const [m, s] = text.split(':').map(Number);
   return (m ?? 0) * 60 + (s ?? 0);
 }

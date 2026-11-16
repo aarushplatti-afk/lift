@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
+import { expect, test } from '../fixtures';
 import {
   createUser,
   hasSupabase,
@@ -175,7 +176,10 @@ test('Flow C: Progress exercises view, ranges, tooltip, units and records', asyn
 
   // 11. Exercises -> Bench -> Records, then Chart -> View progress.
   await nav(page, 'Exercises').click();
-  await page.getByRole('link', { name: /Barbell Bench Press/ }).first().click();
+  await page
+    .getByRole('link', { name: /Barbell Bench Press/ })
+    .first()
+    .click();
   await page.getByRole('radio', { name: 'Records' }).click();
   // Spec says 510.3 kg, but P19 mandates formatVolume, which rounds to whole units (510 kg).
   const date = shortDate(lastDay);

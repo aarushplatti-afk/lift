@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../fixtures';
 import { hasSupabase, PASSWORD, SKIP_REASON } from './helpers';
 
 test.skip(!hasSupabase, SKIP_REASON);
