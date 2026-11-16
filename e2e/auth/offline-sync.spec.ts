@@ -14,6 +14,7 @@ import {
 } from './helpers';
 
 test.skip(!hasSupabase, SKIP_REASON);
+test.use({ allowedConsoleErrors: [/net::ERR_INTERNET_DISCONNECTED/] });
 
 test('19.7: full workout and weigh-in offline sync once online, no duplicates', async ({
   page,

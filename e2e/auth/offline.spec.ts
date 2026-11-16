@@ -9,6 +9,7 @@ import {
 } from './helpers';
 
 test.skip(!hasSupabase, SKIP_REASON);
+test.use({ allowedConsoleErrors: [/net::ERR_INTERNET_DISCONNECTED/] });
 
 let user: TestUser;
 test.beforeAll(async () => {

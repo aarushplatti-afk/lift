@@ -12,6 +12,7 @@ import {
 } from './helpers';
 
 test.skip(!hasSupabase, SKIP_REASON);
+test.use({ allowedConsoleErrors: [/status of 400|net::ERR_FAILED/] });
 
 const NEW_PASSWORD = 'brand-new-password-9';
 

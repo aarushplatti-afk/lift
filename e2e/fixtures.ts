@@ -1,9 +1,10 @@
 import { expect, test as base } from '@playwright/test';
 
-const DEFAULT_ALLOWED: RegExp[] = [/net::ERR_INTERNET_DISCONNECTED/, /Failed to load resource/];
+const DEFAULT_ALLOWED: RegExp[] = [];
 
 interface Options {
-  /** Extra console.error patterns a spec may opt in to via test.use({ allowedConsoleErrors: [...] }). */
+  /** Extra console.error patterns a spec may opt in to via test.use({ allowedConsoleErrors: [/a|b/] }).
+   * Use ONE combined regex: Playwright reads a two-element array as a [value, options] tuple. */
   allowedConsoleErrors: RegExp[];
 }
 
