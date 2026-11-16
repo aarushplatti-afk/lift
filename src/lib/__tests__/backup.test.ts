@@ -95,6 +95,34 @@ describe('parseBackup', () => {
     if (again.ok) expect(again.backup).toEqual(original);
   });
 
+  it('round-trips onboardedAt and accepts a backup without it', () => {
+    const original = valid();
+    expect(original.settings.onboardedAt).toBeUndefined();
+    const withFlag = parseOf((d) => {
+      (d.settings as Doc).onboardedAt = 1_700_000_000_000;
+    });
+    expect(withFlag.ok && withFlag.backup.settings.onboardedAt).toBe(1_700_000_000_000);
+    if (withFlag.ok) {
+      const again = parseBackup(
+        JSON.stringify(
+          buildBackup(withFlag.backup, {
+            userId: withFlag.backup.userId,
+            exportedAt: 1,
+            appVersion: 'x',
+          }),
+        ),
+      );
+      expect(again.ok && again.backup.settings.onboardedAt).toBe(1_700_000_000_000);
+    }
+  });
+
+  it.each([0, -1, 1.5])('rejects onboardedAt %s', (v) => {
+    const r = parseOf((d) => {
+      (d.settings as Doc).onboardedAt = v;
+    });
+    expect(r.ok).toBe(false);
+  });
+
   describe('buildBackup placeholders', () => {
     const META = {
       userId: OWNER,

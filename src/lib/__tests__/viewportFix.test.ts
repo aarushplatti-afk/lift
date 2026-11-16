@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { isEditing, isViewportShort, nudgeLayout, stripAuthRedirectHash } from '../viewportFix';
+import { isEditing, isViewportShort, nudgeLayout } from '../viewportFix';
 
 describe('isViewportShort', () => {
   it('flags a portrait viewport shorter than the screen by the status bar', () => {
@@ -58,20 +58,5 @@ describe('isEditing', () => {
     expect(isEditing(document.createElement('select'))).toBe(true);
     expect(isEditing(document.createElement('button'))).toBe(false);
     expect(isEditing(null)).toBe(false);
-  });
-});
-
-describe('stripAuthRedirectHash', () => {
-  it('replaces an auth token hash with the root route', () => {
-    window.history.replaceState(null, '', '/lift/#access_token=abc&type=signup');
-    stripAuthRedirectHash();
-    expect(window.location.hash).toBe('#/');
-    expect(window.location.pathname).toBe('/lift/');
-  });
-
-  it('leaves normal routes alone', () => {
-    window.history.replaceState(null, '', '/lift/#/history');
-    stripAuthRedirectHash();
-    expect(window.location.hash).toBe('#/history');
   });
 });

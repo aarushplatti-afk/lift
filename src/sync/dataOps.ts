@@ -7,7 +7,7 @@ import {
 } from '../db/repos/dataOps';
 import { getOwner } from '../db/repos/meta';
 import { countOutbox, countOutboxByState } from '../db/repos/outbox';
-import { DEFAULT_SETTINGS } from '../db/repos/settings';
+import { DEFAULT_SETTINGS, getSettings } from '../db/repos/settings';
 import { buildBackup, remapForUser, type BackupCounts, type LiftBackup } from '../lib/backup';
 import { toCsv } from '../lib/csv';
 import { isQuotaError } from '../lib/platform/storage';
@@ -98,7 +98,7 @@ export function createDataOps(deps: {
     return undefined;
   }
 
-  async function tombstoneServer(userId: string): Promise<void> {
+  async function tombstoneServer(userId: string, onboardedAt: number): Promise<void> {
     const authRetry = createAuthRetry(client);
     const stamp = new Date(now()).toISOString();
     for (const name of TOMBSTONE_TABLES) {
@@ -112,7 +112,10 @@ export function createDataOps(deps: {
     const settings = client.from('user_settings') as unknown as LooseTable;
     await authRetry(() =>
       assertWrite(
-        settings.upsert({ user_id: userId, data: DEFAULT_SETTINGS }, { onConflict: 'user_id' }),
+        settings.upsert(
+          { user_id: userId, data: { ...DEFAULT_SETTINGS, onboardedAt } },
+          { onConflict: 'user_id' },
+        ),
       ),
     );
   }
@@ -181,12 +184,13 @@ export function createDataOps(deps: {
       try {
         await engine.runExclusive(async () => {
           await assertNoActiveWorkout();
+          const onboardedAt = (await getSettings()).onboardedAt ?? now();
           try {
-            await tombstoneServer(owner.userId);
+            await tombstoneServer(owner.userId, onboardedAt);
           } catch {
             throw new ServerDeleteError();
           }
-          await clearUserDataLocal(owner.userId);
+          await clearUserDataLocal(owner.userId, onboardedAt);
         });
       } catch (err) {
         if (err instanceof ServerDeleteError) return failure('server_error');

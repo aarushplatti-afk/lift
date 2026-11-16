@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { LIFT_NS, bodyweightId, newId, seededExerciseId, userNamespace } from '../ids';
+import {
+  LIFT_NS,
+  bodyweightId,
+  newId,
+  seededExerciseId,
+  starterTemplateId,
+  userNamespace,
+} from '../ids';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const A = '11111111-1111-4111-8111-111111111111';
@@ -28,5 +35,14 @@ describe('ids', () => {
     expect(bodyweightId(A, '2026-01-01')).toBe(bodyweightId(A, '2026-01-01'));
     expect(bodyweightId(A, '2026-01-01')).not.toBe(bodyweightId(A, '2026-01-02'));
     expect(bodyweightId(A, '2026-01-01')).not.toBe(bodyweightId(B, '2026-01-01'));
+  });
+});
+
+describe('starterTemplateId', () => {
+  it('is deterministic, per user and per key', () => {
+    expect(starterTemplateId(A, 'push')).toMatch(UUID);
+    expect(starterTemplateId(A, 'push')).toBe(starterTemplateId(A, 'push'));
+    expect(starterTemplateId(A, 'push')).not.toBe(starterTemplateId(A, 'pull'));
+    expect(starterTemplateId(A, 'push')).not.toBe(starterTemplateId(B, 'push'));
   });
 });

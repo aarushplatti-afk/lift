@@ -113,6 +113,7 @@ export interface SettingsData {
   weightIncrementLb: number;
   weightIncrementKg: number;
   bodyweightGoalKg?: number;
+  onboardedAt?: number;
   schemaVersion: number;
 }
 

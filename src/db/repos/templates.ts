@@ -2,8 +2,9 @@ import Dexie, { liveQuery, type Observable } from 'dexie';
 import { db } from '../schema';
 import { enqueue, runWrite } from './outbox';
 import { requireUserId } from './meta';
-import { normalizeName } from '../../lib/exercises';
-import { newId } from '../../lib/ids';
+import { nameKey, normalizeName } from '../../lib/exercises';
+import { newId, starterTemplateId } from '../../lib/ids';
+import { buildStarterExercises, STARTER_TEMPLATES } from '../../lib/starterTemplates';
 import {
   compareTemplates,
   duplicateName,
@@ -107,4 +108,23 @@ export async function markTemplateUsed(id: string, at: number): Promise<void> {
   const row = await db.templates.get(id);
   if (!row) return;
   await put({ ...row, lastUsedAt: at, updatedAt: at });
+}
+
+export async function addStarterTemplates(now: number = Date.now()): Promise<number> {
+  const userId = await requireUserId();
+  const live = await db.exercises.filter((e) => !e.archived).toArray();
+  const byKey = new Map<string, string>();
+  for (const e of live) if (!byKey.has(nameKey(e.name))) byKey.set(nameKey(e.name), e.id);
+  return runWrite(['templates'], async () => {
+    let added = 0;
+    for (const def of STARTER_TEMPLATES) {
+      const id = starterTemplateId(userId, def.key);
+      if ((await db.templates.get(id)) !== undefined) continue;
+      const exercises = buildStarterExercises(def, (n) => byKey.get(nameKey(n)));
+      if (exercises.length === 0) continue;
+      await put({ id, userId, name: def.name, exercises, createdAt: now, updatedAt: now });
+      added += 1;
+    }
+    return added;
+  });
 }

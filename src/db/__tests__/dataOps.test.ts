@@ -160,10 +160,27 @@ describe('replaceAllLocal', () => {
     expect(await db.bodyweight.toArray()).toEqual(stamp(b.bodyweight));
     expect(await db.settings.get('singleton')).toEqual({
       ...b.settings,
+      onboardedAt: NOW,
       id: 'singleton',
       userId: U,
       updatedAt: NOW,
     });
+  });
+
+  it('keeps the current onboardedAt, else the backup one, else now', async () => {
+    await db.settings.put({
+      ...DEFAULT_SETTINGS,
+      onboardedAt: 777,
+      id: 'singleton',
+      userId: U,
+      updatedAt: 1,
+    });
+    await replaceAllLocal(backupWith({ ...DEFAULT_SETTINGS, onboardedAt: 123 }), U, NOW);
+    expect((await db.settings.get('singleton'))?.onboardedAt).toBe(777);
+    await db.settings.clear();
+    await db.syncQueue.clear();
+    await replaceAllLocal(backupWith({ ...DEFAULT_SETTINGS, onboardedAt: 123 }), U, NOW);
+    expect((await db.settings.get('singleton'))?.onboardedAt).toBe(123);
   });
 
   it('enqueues deletes (workouts, templates, bodyweight, exercises) before all upserts', async () => {
@@ -291,6 +308,21 @@ describe('replaceAllLocal', () => {
   });
 });
 
+function backupWith(settings: LiftBackup['settings']): LiftBackup {
+  return {
+    format: 'lift-backup',
+    schemaVersion: 1,
+    exportedAt: '2026-11-15T00:00:00.000Z',
+    appVersion: 'test',
+    userId: U,
+    exercises: [],
+    workouts: [],
+    templates: [],
+    bodyweight: [],
+    settings,
+  };
+}
+
 describe('clearUserDataLocal', () => {
   it('clears data, outbox and sync state, drops transient meta, keeps owner and initialPullDone', async () => {
     await db.exercises.put(ex('e1', 'A'));
@@ -307,20 +339,46 @@ describe('clearUserDataLocal', () => {
       { key: 'restTimer', value: { workoutId: 'w1', endsAt: 1, durationSec: 60 } },
       { key: 'initialPullDone', value: true },
     ]);
-    await clearUserDataLocal(U);
+    await db.meta.bulkPut([
+      { key: 'lastBackupAt', value: 5 },
+      { key: 'backupTrackingSince', value: 4 },
+    ]);
+    await clearUserDataLocal(U, 999);
     for (const t of [
       db.exercises,
       db.workouts,
       db.templates,
       db.bodyweight,
-      db.settings,
       db.syncQueue,
       db.syncState,
     ]) {
       expect(await t.count()).toBe(0);
     }
+    const settings = await db.settings.toArray();
+    expect(settings).toHaveLength(1);
+    expect(settings[0]).toMatchObject({ ...DEFAULT_SETTINGS, onboardedAt: 999, userId: U });
     const keys = (await db.meta.toArray()).map((m) => m.key).sort();
-    expect(keys).toEqual(['initialPullDone', 'ownerEmail', 'ownerUserId']);
+    expect(keys).toEqual([
+      'backupTrackingSince',
+      'initialPullDone',
+      'lastBackupAt',
+      'ownerEmail',
+      'ownerUserId',
+    ]);
+  });
+
+  it('keeps an existing onboardedAt over the fallback and enqueues nothing', async () => {
+    await db.settings.put({
+      ...DEFAULT_SETTINGS,
+      unit: 'kg',
+      onboardedAt: 42,
+      id: 'singleton',
+      userId: U,
+      updatedAt: 1,
+    });
+    await clearUserDataLocal(U, 999);
+    expect(await db.settings.get('singleton')).toMatchObject({ unit: 'lb', onboardedAt: 42 });
+    expect(await db.syncQueue.count()).toBe(0);
   });
 
   it('throws active_workout inside the transaction and clears nothing', async () => {

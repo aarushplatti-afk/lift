@@ -327,7 +327,7 @@ describe('deleteAllData', () => {
     expect(server.tables.exercises.every((r) => r.deleted_at)).toBe(true);
     expect(server.tables.workouts.find((r) => r.id === 'w1')?.deleted_at).toBeTruthy();
     expect(server.tables.workouts.find((r) => r.id === 'w-other')?.deleted_at).toBeNull();
-    expect(server.tables.user_settings[0]?.data).toEqual(DEFAULT_SETTINGS);
+    expect(server.tables.user_settings[0]?.data).toEqual({ ...DEFAULT_SETTINGS, onboardedAt: NOW });
     expect(await db.exercises.count()).toBe(0);
     expect(await db.syncQueue.count()).toBe(0);
   });

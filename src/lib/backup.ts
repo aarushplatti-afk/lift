@@ -195,6 +195,7 @@ const settingsSchema = z
     weightIncrementLb: z.number().positive().optional(),
     weightIncrementKg: z.number().positive().optional(),
     bodyweightGoalKg: z.number().gt(0).lt(GOAL_MAX_KG).optional(),
+    onboardedAt: z.number().int().positive().optional(),
     schemaVersion: z.number().int().positive().optional(),
   })
   .transform((s): SettingsData => {

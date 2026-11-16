@@ -1,10 +1,21 @@
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
+const pkg = JSON.parse(readFileSync(path.resolve(import.meta.dirname, 'package.json'), 'utf8')) as {
+  version: string;
+};
+
 export default defineConfig({
   base: '/lift/',
+  define: {
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify(
+      process.env.VITE_APP_VERSION ?? pkg.version,
+    ),
+  },
+  build: { chunkSizeWarningLimit: 900 },
   plugins: [
     react(),
     VitePWA({
