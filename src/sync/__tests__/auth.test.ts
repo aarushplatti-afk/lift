@@ -27,6 +27,7 @@ vi.mock('../../lib/supabase', () => ({
 vi.mock('../engine', () => ({ getSyncEngine: () => ({ syncNow, cancelRetry }) }));
 
 const {
+  abandonPasswordReset,
   beginPasswordReset,
   completePasswordReset,
   getCachedSession,
@@ -316,5 +317,29 @@ describe('password reset session', () => {
       ok: false,
       reason: 'invalid_link',
     });
+  });
+
+  it('abandon signs the recovery client out locally and invalidates the reset', async () => {
+    recoveryAuth.setSession.mockResolvedValue(okSession);
+    await beginPasswordReset(tokens);
+    await abandonPasswordReset();
+    expect(recoveryAuth.signOut).toHaveBeenCalledWith({ scope: 'local' });
+    expect(await completePasswordReset('newpassword')).toMatchObject({
+      ok: false,
+      reason: 'invalid_link',
+    });
+    expect(recoveryAuth.updateUser).not.toHaveBeenCalled();
+  });
+
+  it('abandon is a no-op without a recovery client', async () => {
+    await abandonPasswordReset();
+    expect(recoveryAuth.signOut).not.toHaveBeenCalled();
+  });
+
+  it('abandon swallows a rejecting signOut', async () => {
+    recoveryAuth.setSession.mockResolvedValue(okSession);
+    await beginPasswordReset(tokens);
+    recoveryAuth.signOut.mockRejectedValueOnce(new Error('net'));
+    await expect(abandonPasswordReset()).resolves.toBeUndefined();
   });
 });

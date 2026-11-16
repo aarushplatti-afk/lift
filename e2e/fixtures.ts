@@ -1,7 +1,5 @@
 import { expect, test as base } from '@playwright/test';
 
-const DEFAULT_ALLOWED: RegExp[] = [];
-
 interface Options {
   /** Extra console.error patterns a spec may opt in to via test.use({ allowedConsoleErrors: [/a|b/] }).
    * Use ONE combined regex: Playwright reads a two-element array as a [value, options] tuple. */
@@ -16,7 +14,6 @@ export const test = base.extend<Fixtures & Options>({
   allowedConsoleErrors: [[], { option: true }],
   consoleGuard: [
     async ({ page, allowedConsoleErrors }, use) => {
-      const allowed = [...DEFAULT_ALLOWED, ...allowedConsoleErrors];
       const problems: string[] = [];
       page.on('pageerror', (err) => {
         problems.push(`pageerror: ${err.message}`);
@@ -24,7 +21,7 @@ export const test = base.extend<Fixtures & Options>({
       page.on('console', (msg) => {
         if (msg.type() !== 'error') return;
         const text = msg.text();
-        if (allowed.some((re) => re.test(text))) return;
+        if (allowedConsoleErrors.some((re) => re.test(text))) return;
         problems.push(`console.error: ${text}`);
       });
       await use(undefined);

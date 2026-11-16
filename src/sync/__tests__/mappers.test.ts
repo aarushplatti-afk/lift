@@ -161,6 +161,26 @@ describe('mappers', () => {
     });
   });
 
+  describe('user_settings onboardedAt sanitizing', () => {
+    const read = (data: Record<string, unknown>) =>
+      fromRow('user_settings', {
+        user_id: 'u1',
+        data: data as Tables<'user_settings'>['data'],
+        updated_at: SERVER_TS,
+      }).record;
+
+    it.each([0, -1, 1.5, Number.NaN, '1700000000000'])('drops %s', (v) => {
+      const rec = read({ unit: 'kg', onboardedAt: v });
+      expect(rec).not.toHaveProperty('onboardedAt');
+      expect(rec.unit).toBe('kg');
+      expect(rec.defaultRestSeconds).toBe(DEFAULT_SETTINGS.defaultRestSeconds);
+    });
+
+    it('keeps a valid positive integer', () => {
+      expect(read({ onboardedAt: 1_700_000_000_000 }).onboardedAt).toBe(1_700_000_000_000);
+    });
+  });
+
   it('flags tombstones', () => {
     const row = {
       ...toRow('exercises', exerciseRecord('e1')),

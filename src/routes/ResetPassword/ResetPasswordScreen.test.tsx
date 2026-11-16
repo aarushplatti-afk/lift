@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { abandonPasswordReset } from '../../sync/auth';
 import { ResetPasswordScreen } from './ResetPasswordScreen';
 
 const begin = vi.hoisted(() => vi.fn());
@@ -17,6 +18,7 @@ const tokens = { accessToken: 'a', refreshToken: 'r' };
 beforeEach(() => {
   begin.mockReset();
   complete.mockReset();
+  vi.mocked(abandonPasswordReset).mockClear();
 });
 
 describe('ResetPasswordScreen', () => {
@@ -53,6 +55,16 @@ describe('ResetPasswordScreen', () => {
     render(<ResetPasswordScreen tokens={tokens} onDone={onDone} />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Link bad.');
     await userEvent.click(screen.getByRole('button', { name: 'Request a new link' }));
+    expect(onDone).toHaveBeenCalledWith(undefined);
+    expect(abandonPasswordReset).toHaveBeenCalledTimes(1);
+  });
+
+  it('Back to sign in abandons the recovery session', async () => {
+    begin.mockResolvedValue({ ok: false, reason: 'error', message: 'Try later.' });
+    const onDone = vi.fn();
+    render(<ResetPasswordScreen tokens={tokens} onDone={onDone} />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Back to sign in' }));
+    expect(abandonPasswordReset).toHaveBeenCalledTimes(1);
     expect(onDone).toHaveBeenCalledWith(undefined);
   });
 

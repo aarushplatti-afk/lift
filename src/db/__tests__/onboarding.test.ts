@@ -31,7 +31,7 @@ describe('completeOnboarding', () => {
       { unit: 'kg', bodyweightKg: 80, addStarterTemplates: true },
       NOW,
     );
-    expect(out).toEqual({ bodyweightSaved: true, templatesAdded: 3 });
+    expect(out).toEqual({ bodyweightSaved: true, templatesAdded: 3, templatesFailed: false });
     const q = await db.syncQueue.orderBy('id').toArray();
     expect(q.map((e) => e.table)).toEqual([
       'templates',
@@ -48,7 +48,7 @@ describe('completeOnboarding', () => {
 
   it('skips templates and weigh-in when not requested', async () => {
     const out = await completeOnboarding({ unit: 'lb', addStarterTemplates: false }, NOW);
-    expect(out).toEqual({ bodyweightSaved: false, templatesAdded: 0 });
+    expect(out).toEqual({ bodyweightSaved: false, templatesAdded: 0, templatesFailed: false });
     expect(await db.templates.count()).toBe(0);
     expect(await db.bodyweight.count()).toBe(0);
     expect((await getSettings()).onboardedAt).toBe(NOW);
@@ -59,9 +59,22 @@ describe('completeOnboarding', () => {
       { unit: 'kg', bodyweightKg: 0, addStarterTemplates: true },
       NOW,
     );
-    expect(out).toEqual({ bodyweightSaved: false, templatesAdded: 3 });
+    expect(out).toEqual({ bodyweightSaved: false, templatesAdded: 3, templatesFailed: false });
     expect(await db.bodyweight.count()).toBe(0);
     expect((await getSettings()).onboardedAt).toBe(NOW);
+  });
+
+  it('does not report a failure when starter templates already exist locally', async () => {
+    await templatesRepo.addStarterTemplates(1);
+    const out = await completeOnboarding({ unit: 'kg', addStarterTemplates: true }, NOW);
+    expect(out).toMatchObject({ templatesAdded: 0, templatesFailed: false });
+  });
+
+  it('reports a failure when no starter template could be added', async () => {
+    for (const e of await db.exercises.toArray())
+      await db.exercises.update(e.id, { archived: true });
+    const out = await completeOnboarding({ unit: 'kg', addStarterTemplates: true }, NOW);
+    expect(out).toMatchObject({ templatesAdded: 0, templatesFailed: true });
   });
 
   it('leaves onboardedAt unset when the first step throws', async () => {

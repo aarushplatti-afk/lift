@@ -55,11 +55,10 @@ export function WelcomeSheet({ onDone }: WelcomeSheetProps) {
     try {
       const result = await action();
       if (
-        addTemplates &&
         typeof result === 'object' &&
         result !== null &&
-        'templatesAdded' in result &&
-        result.templatesAdded === 0
+        'templatesFailed' in result &&
+        result.templatesFailed === true
       ) {
         useToastStore.getState().show({ message: TEMPLATES_FAILED });
       }

@@ -26,7 +26,9 @@ vi.mock('../../../hooks/useInstallPrompt', () => ({ useInstallPrompt: () => inst
 
 beforeEach(async () => {
   await wipeLocalData();
-  complete.mockReset().mockResolvedValue({ bodyweightSaved: true, templatesAdded: 3 });
+  complete
+    .mockReset()
+    .mockResolvedValue({ bodyweightSaved: true, templatesAdded: 3, templatesFailed: false });
   skip.mockReset().mockResolvedValue(undefined);
   install.value = { platform: 'other', canPrompt: false, promptInstall: vi.fn() };
   useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, unit: 'lb' }, hydrated: true });
@@ -76,8 +78,44 @@ describe('OnboardingGate', () => {
     });
   });
 
+  it('does not show the templates toast when none failed', async () => {
+    useToastStore.getState().dismiss();
+    complete.mockResolvedValue({
+      bodyweightSaved: false,
+      templatesAdded: 0,
+      templatesFailed: false,
+    });
+    render(<OnboardingGate />);
+    await screen.findByRole('dialog');
+    await userEvent.click(screen.getByRole('button', { name: 'Get started' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    expect(useToastStore.getState().toast?.message ?? '').not.toMatch(/starter templates/);
+  });
+
+  it('never reappears in the same mount once onboardedAt was set', async () => {
+    render(<OnboardingGate />);
+    await screen.findByRole('dialog');
+    act(() => {
+      useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, onboardedAt: 7 } });
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    act(() => {
+      useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS } });
+    });
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
   it('shows a toast when starter templates could not be added', async () => {
-    complete.mockResolvedValue({ bodyweightSaved: false, templatesAdded: 0 });
+    complete.mockResolvedValue({
+      bodyweightSaved: false,
+      templatesAdded: 0,
+      templatesFailed: true,
+    });
     render(<OnboardingGate />);
     await screen.findByRole('dialog');
     await userEvent.click(screen.getByRole('button', { name: 'Get started' }));
