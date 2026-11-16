@@ -1,7 +1,8 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../fixtures';
 import { createUser, hasSupabase, PASSWORD, SKIP_REASON, signInUi, type TestUser } from './helpers';
 
 test.skip(!hasSupabase, SKIP_REASON);
+test.use({ allowedConsoleErrors: [/status of 400/] });
 
 let user: TestUser;
 test.beforeAll(async () => {

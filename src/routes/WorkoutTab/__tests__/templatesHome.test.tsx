@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { useToastStore } from '../../../components/ui/toastStore';
 import { createExercise } from '../../../db/repos/exercises';
+import { ensureSeeded } from '../../../db/seed';
 import { setOwner, wipeLocalData } from '../../../db/repos/meta';
 import { DEFAULT_SETTINGS } from '../../../db/repos/settings';
 import { getTemplate, listTemplates, saveTemplate } from '../../../db/repos/templates';
@@ -87,6 +88,18 @@ describe('Workout home templates', () => {
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Create template' }));
     expect(await screen.findByText('New template screen')).toBeInTheDocument();
+  });
+
+  it('adds the starter templates from the empty state', async () => {
+    await ensureSeeded('u1');
+    await startStore();
+    const user = userEvent.setup();
+    renderHome();
+    await user.click(await screen.findByRole('button', { name: 'Add starter templates' }));
+    expect(await screen.findByRole('button', { name: 'Push Day' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pull Day' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Leg Day' })).toBeInTheDocument();
+    expect(screen.queryByText('No templates yet')).not.toBeInTheDocument();
   });
 
   it('lists templates with summary and last used text', async () => {

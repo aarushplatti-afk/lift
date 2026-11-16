@@ -33,8 +33,7 @@ export function isSupabaseConfigured(): boolean {
   return readEnv() !== undefined;
 }
 
-export function getSupabase(): LiftClient {
-  if (client) return client;
+function requireSafeEnv(): { url: string; key: string } {
   const env = readEnv();
   if (!env) {
     throw new Error('Supabase is not configured (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY)');
@@ -42,6 +41,34 @@ export function getSupabase(): LiftClient {
   if (env.key.startsWith('sb_secret_') || jwtRole(env.key) === 'service_role') {
     throw new Error('Refusing to use a secret or service-role key in the client');
   }
+  return env;
+}
+
+export function createRecoveryClient(): LiftClient {
+  const env = requireSafeEnv();
+  const memory = new Map<string, string>();
+  return createClient<Database>(env.url, env.key, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      storageKey: 'lift-recovery',
+      storage: {
+        getItem: (k) => memory.get(k) ?? null,
+        setItem: (k, v) => {
+          memory.set(k, v);
+        },
+        removeItem: (k) => {
+          memory.delete(k);
+        },
+      },
+    },
+  });
+}
+
+export function getSupabase(): LiftClient {
+  if (client) return client;
+  const env = requireSafeEnv();
   client = createClient<Database>(env.url, env.key, {
     auth: {
       persistSession: true,

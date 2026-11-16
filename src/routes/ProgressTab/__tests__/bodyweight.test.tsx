@@ -229,7 +229,7 @@ describe('empty state and log card', () => {
     renderView();
     await screen.findByText('No weigh-ins yet');
     for (const el of [weightInput(), dateInput(), screen.getByLabelText('Note (optional)')]) {
-      expect(el.className).toContain('text-[16px]');
+      expect(el.className).toContain('text-[max(16px,1rem)]');
     }
   });
 });

@@ -41,7 +41,7 @@ export function Toggle({ label, checked, onChange, description, disabled = false
         }`}
       >
         <span
-          className={`absolute left-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-surface text-[14px] font-bold leading-none text-primary shadow-lg motion-safe:transition-transform ${
+          className={`absolute left-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-surface text-body-sm font-bold leading-none text-primary shadow-lg motion-safe:transition-transform ${
             checked ? 'translate-x-5' : 'translate-x-0'
           }`}
         >

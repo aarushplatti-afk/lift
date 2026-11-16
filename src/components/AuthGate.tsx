@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { SignInScreen, type AuthMode } from '../routes/SignIn/SignInScreen';
 import { useAuthStore } from '../store/auth';
 import { useSyncStore } from '../store/sync';
-import { PASSWORD_MIN_LENGTH, signIn, signUp } from '../sync/auth';
+import { PASSWORD_MIN_LENGTH, requestPasswordReset, signIn, signUp } from '../sync/auth';
 import { Button } from './ui/Button';
 
 const DIFFERENT_ACCOUNT_WARNING =
@@ -17,7 +17,7 @@ function CenteredMessage({ title, children }: { title: string; children?: ReactN
   );
 }
 
-function SignedOut() {
+function SignedOut({ initialEmail }: { initialEmail?: string }) {
   const pending = useSyncStore((s) => s.status.pendingCount);
   const [mode, setMode] = useState<AuthMode>('signin');
   const [busy, setBusy] = useState(false);
@@ -47,9 +47,29 @@ function SignedOut() {
     }
   };
 
+  const onRequestReset = async (email: string): Promise<void> => {
+    setBusy(true);
+    setError(undefined);
+    setInfo(undefined);
+    try {
+      const result = await requestPasswordReset(email);
+      if (result.ok) {
+        setInfo(
+          `If an account exists for ${email}, we sent a reset link. Open it, set a new password, then sign in here.`,
+        );
+      } else setError(result.message);
+    } catch {
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <SignInScreen
       mode={mode}
+      onRequestReset={onRequestReset}
+      initialEmail={initialEmail}
       onModeChange={(next) => {
         setMode(next);
         setError(undefined);
@@ -97,11 +117,17 @@ export function ConfigError() {
   );
 }
 
-export function AuthGate({ children }: { children: ReactNode }) {
+export function AuthGate({
+  children,
+  initialEmail,
+}: {
+  children: ReactNode;
+  initialEmail?: string;
+}) {
   const status = useAuthStore((s) => s.status);
   const initialPullDone = useAuthStore((s) => s.initialPullDone);
   if (status === 'loading') return <CenteredMessage title="Lift" />;
-  if (status === 'signedOut') return <SignedOut />;
+  if (status === 'signedOut') return <SignedOut initialEmail={initialEmail} />;
   if (!initialPullDone) return <SettingUp />;
   return <>{children}</>;
 }

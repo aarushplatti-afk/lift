@@ -67,7 +67,7 @@ describe('History tab bar visibility', () => {
     });
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole('link', { name: 'Push Day, Thu, Nov 12' }));
+    await user.click(await screen.findByRole('link', { name: /^Push Day, Thu, Nov 12/ }));
     expect(await screen.findByRole('heading', { name: 'Push Day', level: 1 })).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Main' })).toBeInTheDocument();
     await user.click(screen.getByRole('link', { name: 'Edit' }));

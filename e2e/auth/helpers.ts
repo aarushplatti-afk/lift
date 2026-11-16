@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { expect, type Locator, type Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
+import { expect, test } from '../fixtures';
 
 export const SUPABASE_URL = process.env.SUPABASE_TEST_URL;
 export const SUPABASE_KEY = process.env.SUPABASE_TEST_KEY;
@@ -23,11 +24,72 @@ function anonClient(): SupabaseClient {
   });
 }
 
-export async function createUser(prefix: string): Promise<TestUser> {
+/**
+ * Signs up a fresh user. When onboarded (default), the user's own session writes a
+ * user_settings row with data.onboardedAt set, so the welcome sheet never appears.
+ */
+export async function createUser(
+  prefix: string,
+  { onboarded = true }: { onboarded?: boolean } = {},
+): Promise<TestUser> {
   const email = `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.test`;
-  const { data, error } = await anonClient().auth.signUp({ email, password: PASSWORD });
+  const client = anonClient();
+  const { data, error } = await client.auth.signUp({ email, password: PASSWORD });
   if (error || !data.user) throw new Error(`signUp failed: ${error?.message ?? 'no user'}`);
-  return { id: data.user.id, email, password: PASSWORD };
+  const user: TestUser = { id: data.user.id, email, password: PASSWORD };
+  if (onboarded) {
+    if (!data.session) {
+      const { error: signInError } = await client.auth.signInWithPassword({
+        email,
+        password: PASSWORD,
+      });
+      if (signInError) throw new Error(`seed sign-in failed: ${signInError.message}`);
+    }
+    const { error: seedError } = await client
+      .from('user_settings')
+      .upsert({ user_id: user.id, data: { onboardedAt: Date.now() } }, { onConflict: 'user_id' });
+    if (seedError) throw new Error(`user_settings seed failed: ${seedError.message}`);
+  }
+  return user;
+}
+
+/** Polls Mailpit for mail to `email` and returns the first URL in the text body matching `match`. */
+export async function latestEmailLink(email: string, match: RegExp): Promise<string> {
+  const base = process.env.SUPABASE_TEST_MAIL_URL?.replace(/\/$/, '');
+  if (!base) {
+    test.skip(true, 'SUPABASE_TEST_MAIL_URL not set (run via npm run e2e:local-supabase)');
+    throw new Error('unreachable');
+  }
+  const deadline = Date.now() + 15_000;
+  let reachable = false;
+  while (Date.now() < deadline) {
+    try {
+      const search = await fetch(
+        `${base}/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`,
+      );
+      if (search.ok) {
+        reachable = true;
+        const body = (await search.json()) as { messages?: { ID: string }[] };
+        const id = body.messages?.[0]?.ID;
+        if (id) {
+          const msg = await fetch(`${base}/api/v1/message/${id}`);
+          if (msg.ok) {
+            const text = ((await msg.json()) as { Text?: string }).Text ?? '';
+            const urls = text.match(/https?:\/\/[^\s<>"')\]]+/g) ?? [];
+            const hit = urls.find((u) => match.test(u));
+            if (hit) return hit;
+          }
+        }
+      }
+    } catch {
+      // mail server unreachable on this attempt
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  if (!reachable) {
+    test.skip(true, `Mailpit unreachable at ${base}`);
+  }
+  throw new Error(`no email link matching ${String(match)} for ${email}`);
 }
 
 /** Reads the user's user_settings.data with a second anon client signed in as the same user. */

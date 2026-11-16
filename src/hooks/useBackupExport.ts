@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useToastStore } from '../components/ui/toastStore';
+import { markBackupExported } from '../db/repos/meta';
 import { saveTextFile } from '../lib/platform/download';
 
 export function useBackupExport(): { exporting: boolean; exportBackup: () => Promise<void> } {
@@ -17,7 +18,10 @@ export function useBackupExport(): { exporting: boolean; exportBackup: () => Pro
         'application/json',
         JSON.stringify(backup, null, 2),
       );
-      if (outcome !== 'cancelled') useToastStore.getState().show({ message: 'Backup exported' });
+      if (outcome !== 'cancelled') {
+        await markBackupExported(Date.now()).catch(() => undefined);
+        useToastStore.getState().show({ message: 'Backup exported' });
+      }
     } catch {
       useToastStore.getState().show({ message: "Couldn't export backup" });
     } finally {

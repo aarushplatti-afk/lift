@@ -9,7 +9,10 @@ export type MetaRow =
   | { key: 'initialPullDone'; value: boolean }
   | { key: 'seedVersion'; value: number }
   | { key: 'activeWorkoutId'; value: string }
-  | { key: 'restTimer'; value: RestTimerSnapshot };
+  | { key: 'restTimer'; value: RestTimerSnapshot }
+  | { key: 'lastBackupAt'; value: number }
+  | { key: 'backupNudgeDismissedAt'; value: number }
+  | { key: 'backupTrackingSince'; value: number };
 export type MetaKey = MetaRow['key'];
 
 export class LiftDB extends Dexie {

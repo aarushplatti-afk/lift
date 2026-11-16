@@ -7,16 +7,35 @@ const auth = {
   getSession: vi.fn(),
   signInWithPassword: vi.fn(),
   signUp: vi.fn(),
+  resetPasswordForEmail: vi.fn(),
   signOut: vi.fn(() => Promise.resolve({ error: null })),
   onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
 };
 const syncNow = vi.fn(() => Promise.resolve());
 const cancelRetry = vi.fn();
 
-vi.mock('../../lib/supabase', () => ({ getSupabase: () => ({ auth }) }));
+const recoveryAuth = {
+  setSession: vi.fn(),
+  updateUser: vi.fn(),
+  signOut: vi.fn(() => Promise.resolve({ error: null })),
+};
+
+vi.mock('../../lib/supabase', () => ({
+  getSupabase: () => ({ auth }),
+  createRecoveryClient: () => ({ auth: recoveryAuth }),
+}));
 vi.mock('../engine', () => ({ getSyncEngine: () => ({ syncNow, cancelRetry }) }));
 
-const { getCachedSession, signIn, signOut, signUp } = await import('../auth');
+const {
+  abandonPasswordReset,
+  beginPasswordReset,
+  completePasswordReset,
+  getCachedSession,
+  requestPasswordReset,
+  signIn,
+  signOut,
+  signUp,
+} = await import('../auth');
 
 beforeEach(async () => {
   await Promise.all(db.tables.map((t) => t.clear()));
@@ -179,5 +198,148 @@ describe('signUp', () => {
     });
     const result = await signUp('n@b.c', 'longenough');
     expect(result.ok).toBe(false);
+  });
+});
+
+describe('requestPasswordReset', () => {
+  it('passes origin + pathname as redirectTo and succeeds', async () => {
+    auth.resetPasswordForEmail.mockResolvedValue({ data: {}, error: null });
+    expect(await requestPasswordReset('a@b.c')).toEqual({ ok: true });
+    expect(auth.resetPasswordForEmail).toHaveBeenCalledWith('a@b.c', {
+      redirectTo: `${window.location.origin}${window.location.pathname}`,
+    });
+  });
+
+  it('maps rate limits', async () => {
+    auth.resetPasswordForEmail.mockResolvedValue({
+      data: null,
+      error: { message: 'x', status: 429, code: 'over_email_send_rate_limit' },
+    });
+    expect(await requestPasswordReset('a@b.c')).toEqual({
+      ok: false,
+      message: 'Too many reset emails. Wait a few minutes and try again.',
+    });
+  });
+
+  it('reports offline without calling Supabase', async () => {
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    try {
+      const res = await requestPasswordReset('a@b.c');
+      expect(res.ok).toBe(false);
+      expect(auth.resetPasswordForEmail).not.toHaveBeenCalled();
+    } finally {
+      online.mockRestore();
+    }
+  });
+
+  it('maps a network failure to the offline copy', async () => {
+    auth.resetPasswordForEmail.mockResolvedValue({
+      data: null,
+      error: { message: 'Failed to fetch' },
+    });
+    const res = await requestPasswordReset('a@b.c');
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.message).toMatch(/offline/);
+  });
+});
+
+describe('password reset session', () => {
+  const tokens = { accessToken: 'AT', refreshToken: 'RT' };
+  const okSession = { data: { session: { user: { email: 'r@b.c' } } }, error: null };
+
+  it('uses only the recovery client and never touches lift-auth or Dexie meta', async () => {
+    await meta.setOwner('u1', 'a@b.c');
+    localStorage.setItem('lift-auth', 'main-session');
+    recoveryAuth.setSession.mockResolvedValue(okSession);
+    expect(await beginPasswordReset(tokens)).toEqual({ ok: true, email: 'r@b.c' });
+    expect(recoveryAuth.setSession).toHaveBeenCalledWith({
+      access_token: 'AT',
+      refresh_token: 'RT',
+    });
+    recoveryAuth.updateUser.mockResolvedValue({ data: { user: { email: 'r@b.c' } }, error: null });
+    expect(await completePasswordReset('newpassword')).toEqual({ ok: true, email: 'r@b.c' });
+    expect(recoveryAuth.updateUser).toHaveBeenCalledWith({ password: 'newpassword' });
+    expect(recoveryAuth.signOut).toHaveBeenCalledWith({ scope: 'local' });
+    expect(auth.signOut).not.toHaveBeenCalled();
+    expect(auth.getSession).not.toHaveBeenCalled();
+    expect(localStorage.getItem('lift-auth')).toBe('main-session');
+    expect(await meta.getOwner()).toEqual({ userId: 'u1', email: 'a@b.c' });
+  });
+
+  it('maps an invalid session to invalid_link', async () => {
+    recoveryAuth.setSession.mockResolvedValue({
+      data: { session: null },
+      error: { message: 'invalid JWT', status: 401 },
+    });
+    expect(await beginPasswordReset(tokens)).toMatchObject({ ok: false, reason: 'invalid_link' });
+  });
+
+  it('rejects short passwords client-side', async () => {
+    recoveryAuth.setSession.mockResolvedValue(okSession);
+    await beginPasswordReset(tokens);
+    expect(await completePasswordReset('short')).toMatchObject({
+      ok: false,
+      reason: 'weak_password',
+    });
+    expect(recoveryAuth.updateUser).not.toHaveBeenCalled();
+  });
+
+  it('maps same_password and weak_password from the server', async () => {
+    recoveryAuth.setSession.mockResolvedValue(okSession);
+    await beginPasswordReset(tokens);
+    recoveryAuth.updateUser.mockResolvedValueOnce({
+      data: { user: null },
+      error: { message: 'same', status: 422, code: 'same_password' },
+    });
+    expect(await completePasswordReset('newpassword')).toEqual({
+      ok: false,
+      reason: 'same_password',
+      message: 'Choose a password different from your current one.',
+    });
+    recoveryAuth.updateUser.mockResolvedValueOnce({
+      data: { user: null },
+      error: { message: 'weak', status: 422, code: 'weak_password' },
+    });
+    expect(await completePasswordReset('newpassword')).toMatchObject({
+      ok: false,
+      reason: 'weak_password',
+    });
+    expect(recoveryAuth.signOut).not.toHaveBeenCalled();
+  });
+
+  it('reports invalid_link when completing without a session', async () => {
+    recoveryAuth.setSession.mockResolvedValue({
+      data: { session: null },
+      error: { message: 'bad' },
+    });
+    await beginPasswordReset(tokens);
+    expect(await completePasswordReset('newpassword')).toMatchObject({
+      ok: false,
+      reason: 'invalid_link',
+    });
+  });
+
+  it('abandon signs the recovery client out locally and invalidates the reset', async () => {
+    recoveryAuth.setSession.mockResolvedValue(okSession);
+    await beginPasswordReset(tokens);
+    await abandonPasswordReset();
+    expect(recoveryAuth.signOut).toHaveBeenCalledWith({ scope: 'local' });
+    expect(await completePasswordReset('newpassword')).toMatchObject({
+      ok: false,
+      reason: 'invalid_link',
+    });
+    expect(recoveryAuth.updateUser).not.toHaveBeenCalled();
+  });
+
+  it('abandon is a no-op without a recovery client', async () => {
+    await abandonPasswordReset();
+    expect(recoveryAuth.signOut).not.toHaveBeenCalled();
+  });
+
+  it('abandon swallows a rejecting signOut', async () => {
+    recoveryAuth.setSession.mockResolvedValue(okSession);
+    await beginPasswordReset(tokens);
+    recoveryAuth.signOut.mockRejectedValueOnce(new Error('net'));
+    await expect(abandonPasswordReset()).resolves.toBeUndefined();
   });
 });

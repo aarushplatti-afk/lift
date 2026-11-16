@@ -23,6 +23,8 @@ jobs:
         env:
           VITE_SUPABASE_URL: http://127.0.0.1:54321
           VITE_SUPABASE_ANON_KEY: placeholder
+      - name: Bundle size budget
+        run: npm run size
       - name: Guard against leaked secrets
         run: node scripts/check-dist-secrets.mjs dist
         env:
@@ -31,7 +33,6 @@ jobs:
   integration:
     name: integration
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

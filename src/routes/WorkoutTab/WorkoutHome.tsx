@@ -6,12 +6,14 @@ import { Dialog } from '../../components/ui/Dialog';
 import { Header } from '../../components/ui/Header';
 import { IconButton } from '../../components/ui/IconButton';
 import { useToastStore } from '../../components/ui/toastStore';
+import { ensureBackupTracking } from '../../db/repos/meta';
 import { discardWorkout, observeOtherInProgress } from '../../db/repos/workouts';
 import { useNow } from '../../hooks/useNow';
 import { elapsedMs } from '../../lib/calc/duration';
 import { formatElapsed } from '../../lib/format';
 import { useActiveWorkoutStore } from '../../store/activeWorkout';
 import type { Workout } from '../../types/domain';
+import { BackupNudgeCard } from './BackupNudgeCard';
 import { TemplateList } from './Templates/TemplateList';
 
 function ActiveWorkoutBanner({ startedAt }: { startedAt: number }) {
@@ -73,6 +75,10 @@ export function WorkoutHome() {
   const others = useOtherInProgress();
   const [starting, setStarting] = useState(false);
   const [pendingDiscard, setPendingDiscard] = useState<Workout | null>(null);
+
+  useEffect(() => {
+    ensureBackupTracking(Date.now()).catch(() => undefined);
+  }, []);
 
   const handleStart = async () => {
     setStarting(true);
@@ -152,6 +158,7 @@ export function WorkoutHome() {
             }}
           />
         ))}
+        <BackupNudgeCard />
         <TemplateList />
       </main>
       <Dialog

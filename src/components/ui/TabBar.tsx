@@ -63,6 +63,7 @@ export function TabBar() {
   return (
     <nav
       aria-label="Main"
+      data-hide-on-keyboard
       className="pb-safe pl-safe pr-safe fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface"
     >
       <ul className="flex">

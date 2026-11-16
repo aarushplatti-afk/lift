@@ -50,7 +50,6 @@ export async function replaceAllLocal(
   now: number,
 ): Promise<BackupCounts & { deleted: number }> {
   const settingsData = sanitizeSettings({ ...DEFAULT_SETTINGS, ...b.settings });
-  const settingsRecord: Settings = { ...settingsData, id: 'singleton', userId, updatedAt: now };
 
   return db.transaction(
     'rw',
@@ -116,6 +115,15 @@ export async function replaceAllLocal(
         await enqueue('bodyweight_entries', rec.id, 'upsert', rec);
       }
 
+      const current = await getSettings();
+      const onboardedAt = current.onboardedAt ?? b.settings.onboardedAt ?? now;
+      const settingsRecord: Settings = {
+        ...settingsData,
+        onboardedAt,
+        id: 'singleton',
+        userId,
+        updatedAt: now,
+      };
       await db.settings.put(settingsRecord);
       await enqueue('user_settings', 'singleton', 'upsert', settingsRecord);
 
@@ -131,7 +139,11 @@ export async function replaceAllLocal(
   );
 }
 
-export function clearUserDataLocal(userId: string): Promise<void> {
+export function clearUserDataLocal(
+  userId: string,
+  now: number,
+  onboardedAtFallback?: number,
+): Promise<void> {
   return db.transaction(
     'rw',
     [
@@ -147,6 +159,8 @@ export function clearUserDataLocal(userId: string): Promise<void> {
     async () => {
       await assertOwner(userId);
       if (await hasActiveWorkout()) throw new DataOpBlockedError('active_workout');
+      const current = await getSettings();
+      const onboardedAt = current.onboardedAt ?? onboardedAtFallback ?? now;
       await Promise.all([
         db.exercises.clear(),
         db.workouts.clear(),
@@ -156,6 +170,13 @@ export function clearUserDataLocal(userId: string): Promise<void> {
         db.syncQueue.clear(),
         db.syncState.clear(),
       ]);
+      await db.settings.put({
+        ...DEFAULT_SETTINGS,
+        onboardedAt,
+        id: 'singleton',
+        userId,
+        updatedAt: now,
+      });
       await db.meta.bulkDelete(['seedVersion', 'activeWorkoutId', 'restTimer']);
     },
   );

@@ -60,7 +60,7 @@ export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(functi
       onBlur={() => {
         setDraft(null);
       }}
-      className={`h-11 min-w-0 rounded-control border bg-surface-2 px-1 text-center text-[16px] tabular-nums text-primary placeholder:text-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+      className={`h-11 min-w-0 rounded-control border bg-surface-2 px-1 text-center text-[max(16px,1rem)] tabular-nums text-primary placeholder:text-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
         invalid ? 'border-danger' : 'border-transparent'
       } ${className}`}
     />

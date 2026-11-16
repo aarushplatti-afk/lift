@@ -49,7 +49,7 @@ export function BottomSheet({ open, title, onClose, children, footer }: BottomSh
           id={titleId}
           ref={titleRef}
           tabIndex={-1}
-          className="px-4 pb-2 pt-4 text-title-sm font-semibold focus:outline-none"
+          className="px-4 pb-2 pt-4 text-title-sm font-semibold"
         >
           {title}
         </h2>

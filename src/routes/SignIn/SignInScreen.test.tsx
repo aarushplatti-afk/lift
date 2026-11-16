@@ -2,7 +2,12 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SignInScreen } from './SignInScreen';
 
-const base = { onModeChange: vi.fn(), passwordMinLength: 8, busy: false } as const;
+const base = {
+  onModeChange: vi.fn(),
+  onRequestReset: vi.fn().mockResolvedValue(undefined),
+  passwordMinLength: 8,
+  busy: false,
+} as const;
 
 describe('SignInScreen', () => {
   it('submits entered credentials', async () => {
@@ -55,5 +60,40 @@ describe('SignInScreen', () => {
   it('shows an info message', () => {
     render(<SignInScreen {...base} mode="signin" onSubmit={vi.fn()} info="Check your email" />);
     expect(screen.getByRole('status')).toHaveTextContent('Check your email');
+  });
+
+  it('offers Forgot password only in sign-in mode', () => {
+    const { rerender } = render(<SignInScreen {...base} mode="signin" onSubmit={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Forgot password?' })).toBeInTheDocument();
+    rerender(<SignInScreen {...base} mode="signup" onSubmit={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: 'Forgot password?' })).not.toBeInTheDocument();
+    rerender(<SignInScreen {...base} mode="forgot" onSubmit={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: 'Forgot password?' })).not.toBeInTheDocument();
+  });
+
+  it('switches to forgot mode from the link', async () => {
+    const onModeChange = vi.fn();
+    render(<SignInScreen {...base} mode="signin" onModeChange={onModeChange} onSubmit={vi.fn()} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Forgot password?' }));
+    expect(onModeChange).toHaveBeenCalledWith('forgot');
+  });
+
+  it('requests a reset with only the email, prefilled from initialEmail', async () => {
+    const onRequestReset = vi.fn().mockResolvedValue(undefined);
+    const onSubmit = vi.fn();
+    render(
+      <SignInScreen
+        {...base}
+        mode="forgot"
+        onSubmit={onSubmit}
+        onRequestReset={onRequestReset}
+        initialEmail="me@x.co"
+      />,
+    );
+    expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Email')).toHaveValue('me@x.co');
+    await userEvent.click(screen.getByRole('button', { name: 'Send reset link' }));
+    expect(onRequestReset).toHaveBeenCalledWith('me@x.co');
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 });

@@ -21,7 +21,7 @@ if (status.error || status.status !== 0) {
 }
 
 // Only the public values are captured; privileged keys are never kept.
-const wanted = new Set(['API_URL', 'ANON_KEY', 'PUBLISHABLE_KEY']);
+const wanted = new Set(['API_URL', 'ANON_KEY', 'PUBLISHABLE_KEY', 'MAILPIT_URL', 'INBUCKET_URL']);
 const values = {};
 for (const line of status.stdout.split(/\r?\n/)) {
   const match = /^([A-Z_]+)=(.*)$/.exec(line.trim());
@@ -35,6 +35,8 @@ if (!url || !key) {
   fail('API_URL or ANON_KEY/PUBLISHABLE_KEY missing from `supabase status -o env`.');
 }
 
+const mailUrl = values.MAILPIT_URL || values.INBUCKET_URL;
+
 const child = spawn(command.join(' '), {
   shell: true,
   stdio: 'inherit',
@@ -44,6 +46,7 @@ const child = spawn(command.join(' '), {
     SUPABASE_TEST_KEY: key,
     VITE_SUPABASE_URL: url,
     VITE_SUPABASE_ANON_KEY: key,
+    ...(mailUrl ? { SUPABASE_TEST_MAIL_URL: mailUrl } : {}),
   },
 });
 child.on('exit', (code, signal) => {

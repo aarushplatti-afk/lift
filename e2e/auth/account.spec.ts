@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../fixtures';
 import {
   createUser,
   dumpDexie,
@@ -10,6 +10,7 @@ import {
 } from './helpers';
 
 test.skip(!hasSupabase, SKIP_REASON);
+test.use({ allowedConsoleErrors: [/net::ERR_INTERNET_DISCONNECTED/] });
 
 let userA: TestUser;
 let userB: TestUser;

@@ -58,6 +58,45 @@ export async function setRestTimer(s: RestTimerSnapshot | null): Promise<void> {
   else await db.meta.put({ key: 'restTimer', value: s });
 }
 
+export interface BackupNudgeMeta {
+  lastBackupAt?: number;
+  dismissedAt?: number;
+  trackingSince?: number;
+}
+
+async function getBackupNudgeMeta(): Promise<BackupNudgeMeta> {
+  const [last, dismissed, since] = await Promise.all([
+    db.meta.get('lastBackupAt'),
+    db.meta.get('backupNudgeDismissedAt'),
+    db.meta.get('backupTrackingSince'),
+  ]);
+  const out: BackupNudgeMeta = {};
+  if (last?.key === 'lastBackupAt') out.lastBackupAt = last.value;
+  if (dismissed?.key === 'backupNudgeDismissedAt') out.dismissedAt = dismissed.value;
+  if (since?.key === 'backupTrackingSince') out.trackingSince = since.value;
+  return out;
+}
+
+export function observeBackupNudgeMeta(): Observable<BackupNudgeMeta> {
+  return liveQuery(getBackupNudgeMeta);
+}
+
+export async function ensureBackupTracking(now: number): Promise<void> {
+  await db.transaction('rw', db.meta, async () => {
+    if ((await db.meta.get('backupTrackingSince')) === undefined) {
+      await db.meta.put({ key: 'backupTrackingSince', value: now });
+    }
+  });
+}
+
+export async function markBackupExported(at: number): Promise<void> {
+  await db.meta.put({ key: 'lastBackupAt', value: at });
+}
+
+export async function dismissBackupNudge(at: number): Promise<void> {
+  await db.meta.put({ key: 'backupNudgeDismissedAt', value: at });
+}
+
 export async function wipeLocalData(): Promise<void> {
   await db.transaction('rw', db.tables, async () => {
     await Promise.all(db.tables.map((t) => t.clear()));

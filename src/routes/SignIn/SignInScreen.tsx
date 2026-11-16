@@ -3,12 +3,14 @@ import type { FormEvent } from 'react';
 import { Button } from '../../components/ui/Button';
 import { TextInput } from '../../components/ui/TextInput';
 
-export type AuthMode = 'signin' | 'signup';
+export type AuthMode = 'signin' | 'signup' | 'forgot';
 
 interface SignInScreenProps {
   mode: AuthMode;
   onModeChange: (mode: AuthMode) => void;
   onSubmit: (email: string, password: string) => Promise<void>;
+  onRequestReset: (email: string) => Promise<void>;
+  initialEmail?: string;
   error?: string;
   info?: string;
   busy: boolean;
@@ -20,22 +22,29 @@ export function SignInScreen({
   mode,
   onModeChange,
   onSubmit,
+  onRequestReset,
+  initialEmail = '',
   error,
   info,
   busy,
   warning,
   passwordMinLength,
 }: SignInScreenProps) {
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [confirmTouched, setConfirmTouched] = useState(false);
 
   const signingUp = mode === 'signup';
+  const forgot = mode === 'forgot';
   const mismatch = signingUp && confirmTouched && confirm !== password;
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
+    if (forgot) {
+      void onRequestReset(email.trim());
+      return;
+    }
     if (signingUp && confirm !== password) {
       setConfirmTouched(true);
       return;
@@ -43,22 +52,25 @@ export function SignInScreen({
     void onSubmit(email.trim(), password);
   };
 
-  const switchMode = () => {
+  const switchMode = (next: AuthMode) => {
     setConfirm('');
     setConfirmTouched(false);
-    onModeChange(signingUp ? 'signin' : 'signup');
+    onModeChange(next);
   };
 
-  const idleLabel = signingUp ? 'Create account' : 'Sign in';
-  const busyLabel = signingUp ? 'Creating account...' : 'Signing in...';
+  const idleLabel = forgot ? 'Send reset link' : signingUp ? 'Create account' : 'Sign in';
+  const busyLabel = forgot ? 'Sending...' : signingUp ? 'Creating account...' : 'Signing in...';
+  const subtitle = forgot
+    ? 'Reset your password'
+    : signingUp
+      ? 'Create your account'
+      : 'Sign in to your account';
 
   return (
     <main className="pt-safe pb-safe mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center gap-6 px-4">
       <div className="flex flex-col gap-1">
         <h1 className="text-title font-bold">Lift</h1>
-        <p className="text-body text-secondary">
-          {signingUp ? 'Create your account' : 'Sign in to your account'}
-        </p>
+        <p className="text-body text-secondary">{subtitle}</p>
       </div>
       {warning ? (
         <div
@@ -90,17 +102,23 @@ export function SignInScreen({
             setEmail(e.target.value);
           }}
         />
-        <TextInput
-          label="Password"
-          type="password"
-          autoComplete={signingUp ? 'new-password' : 'current-password'}
-          required
-          minLength={signingUp ? passwordMinLength : undefined}
-          value={password}
-          onChange={(e) => {
-            setPassword(e.target.value);
-          }}
-        />
+        {forgot ? (
+          <p className="text-body-sm text-secondary">
+            Enter your email and we will send you a link to set a new password.
+          </p>
+        ) : (
+          <TextInput
+            label="Password"
+            type="password"
+            autoComplete={signingUp ? 'new-password' : 'current-password'}
+            required
+            minLength={signingUp ? passwordMinLength : undefined}
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+            }}
+          />
+        )}
         {signingUp ? (
           <TextInput
             label="Confirm password"
@@ -128,15 +146,28 @@ export function SignInScreen({
         <Button type="submit" size="lg" fullWidth disabled={busy} aria-busy={busy}>
           {busy ? busyLabel : idleLabel}
         </Button>
+        {mode === 'signin' ? (
+          <button
+            type="button"
+            className="min-h-tap self-center font-semibold text-accent underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            onClick={() => {
+              switchMode('forgot');
+            }}
+          >
+            Forgot password?
+          </button>
+        ) : null}
       </form>
       <p className="text-center text-body-sm text-secondary">
-        {signingUp ? 'Already have an account?' : 'New to Lift?'}{' '}
+        {forgot ? 'Remembered it?' : signingUp ? 'Already have an account?' : 'New to Lift?'}{' '}
         <button
           type="button"
           className="min-h-tap font-semibold text-accent underline-offset-4 hover:underline"
-          onClick={switchMode}
+          onClick={() => {
+            switchMode(signingUp || forgot ? 'signin' : 'signup');
+          }}
         >
-          {signingUp ? 'Sign in' : 'Create an account'}
+          {signingUp || forgot ? 'Sign in' : 'Create an account'}
         </button>
       </p>
     </main>

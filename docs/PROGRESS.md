@@ -1,6 +1,6 @@
 # Lift — Progress Log
 
-Last updated: 2026-11-15. Branch: `m9-sync-data`.
+Last updated: 2026-11-15. Milestone: M10 Hardening (v1 candidate, version 1.0.0). Branch: `m10-hardening`.
 
 ## Done
 - Step 0: repo created, PRD moved to docs/PRD.md, Claude Code config (CLAUDE.md, agents, settings, commands).
@@ -104,8 +104,24 @@ Last updated: 2026-11-15. Branch: `m9-sync-data`.
   - Settings: Account & Sync detail (pending and failed changes, last synced, Sync now, Sign out) and a Data section (export, CSV, import, delete all).
   - Tests: 1298 unit tests in 105 files. RLS plus two-device simulation: 76 passed, 1 skipped. E2E: Flow E, cross-account import, delete-all on two devices, offline sync and expired token offline; full e2e run 27 passed, 1 skipped.
 
+- M9 merged to `main` (PR #12).
+
+### M10 Hardening (branch `m10-hardening`, spec docs/milestones/M10-spec.md)
+- 10.1a onboarding, starter templates and backup-nudge data layer; `onboardedAt` in settings; delete-all and import keep it (`2d03b59`).
+- 10.1b password reset backend: redirect captured before render, isolated recovery client, signup-confirmed and error redirects; local auth config (`2d03b59`).
+- 10.3a install prompt, keyboard helper, bundle budget script (`npm run size`), version define, CI size step; `integration` no longer `continue-on-error` (`2d03b59`).
+- 10.4a e2e infrastructure: console-error guard fixture, `createUser` with `onboarded` option, Mailpit email-link helper (`4a6e62b`).
+- 10.3b install prompt and keyboard handling wired in; tab bar and mini-bar hide while the keyboard is open (`c0bec81`).
+- 10.1c/10.1d forgot and reset screens, redirect toasts, welcome sheet and gate, install help, About section, backup nudge card, app error boundary (`e6288cd`).
+- 10.2 accessibility: contrast-tested light tokens, rem type scale, reduced motion, focus-visible, focus trap and return, richer history labels, no link inside a button, keyboard padding (`3919013`).
+- 10.4b specs: onboarding, password reset, a11y, About; signup expects the welcome sheet (`072b839`). Offline sign-out failure logs a warning, not an error (`5dfdaf9`). Review fixes: onboarding sheet closes when the flag arrives, lazy Settings, atomic starter templates, abandon reset, sanitized pulled `onboardedAt` (`b5cb883`).
+- 10.3c measured 2026-11-15 (`npm run build` then `npm run size`): initial JS 196.5 kB gz against the 250 kB budget. Entry 155.6 kB; preloaded chunks 40.9 kB (one 33.8 kB `settings-*.js` chunk plus six smaller). New screens are `lazy()`.
+- 10.5 README rewritten to the spec §6 sections; `package.json` and `package-lock.json` version 1.0.0; this log.
+- 10.6 §17 audit: pending (code-reviewer).
+
 ## In progress
-- M9 PR, then M10 hardening.
+- M10 10.6 §17 audit (code-reviewer), then PR to `main`, merge, deploy, device checks and Lighthouse. See owner to-dos below.
+- v1 is pending owner sign-off.
 - Known exception to "no unused exports": `pickPreviousWorkout`, `setGroup`, `SetGroup` and `RestPhase` are spec contracts used only in tests or inside their own module.
 
 ## Blocked
@@ -227,6 +243,21 @@ Last updated: 2026-11-15. Branch: `m9-sync-data`.
   - N18/N19: persist after finish. Quota errors open the blocking dialog.
   - N20/N21: CSV formula guard. Delete all needs the exact text `DELETE`. Import needs a summary and a confirm.
   - N22: zod and CSV are lazy-loaded.
+- 2026-11-15, M10 decisions (accepted architect defaults; reversible; full list in docs/milestones/M10-spec.md §0, questions in §8):
+  - R1–R7 password reset: the email link uses the implicit flow back to the Pages URL. Tokens are captured before HashRouter mounts and kept in memory only. The reset runs on an isolated in-memory client (`lift-recovery`), so it never touches the cached session, Dexie or the outbox. No auto sign-in after reset (email prefilled). The request copy never reveals whether an account exists. An invalid or used link shows a toast once.
+  - O1–O6 onboarding: `onboardedAt` lives in the synced settings document. The welcome sheet shows once per account, when settings are loaded and there are no workouts, templates or weigh-ins. Delete all and import keep the flag. The sheet is skippable. Write order: starter templates, weigh-in, settings last. Starter templates (Push, Pull, Leg Day) have deterministic ids; a template is skipped when an exercise is missing or the template already exists.
+  - I1–I2 install and backup nudge: `beforeinstallprompt` is captured before render. "Install app" appears in About only when the browser offers the prompt. The 30-day backup nudge is per device; "Not now" snoozes it for 30 days.
+  - A1 contrast deviation: the light accent is `#1D4ED8` (`29 78 216`), not the spec's `#2563EB`. The spec value measured 4.47:1 on `surface-2`, below 4.5:1. On-accent is white. Other light tokens per A1. Dark theme unchanged. Enforced by `src/styles/__tests__/contrast.test.ts`.
+  - A2–A4: rem type scale, reduced motion, `:focus-visible` outline, dialogs and sheets trap focus and return it on close, inputs at least 16 px.
+  - A5: `AppErrorBoundary` wraps the shell (Copy details, Export backup, Reload).
+  - K1 keyboard: open when the viewport loses more than 120 px. Tab bar and mini-bar hide; the rest timer stays.
+  - S1 bundle: gzip of the entry and modulepreloads in `dist/index.html`. Budget 250 kB, warning 230 kB, enforced by `npm run size` in CI. New screens are lazy-loaded.
+  - V1 version: `package.json` version is injected as `VITE_APP_VERSION`; 1.0.0.
+  - Z1 Lighthouse: see Known limitations (M10).
+  - C1 console guard: e2e fails on any `pageerror` or `console.error`. Only offline network noise is allow-listed.
+  - C2 CI: `integration` has no `continue-on-error`. The owner makes it required after the first green run.
+  - Q1–Q8 resolved with defaults (spec §8). Q1 was implemented with `#1D4ED8`, see A1. Q2 DevTools plus offline e2e. Q3 owner action. Q4 deferrals. Q5 manual sign-in. Q6 default SMTP. Q7 starter checkbox on. Q8 empty accounts see the sheet once.
+  - Exception to "no unused exports": `ResetFailure`, `ResetRequestResult`, `BeginResetResult`, `CompleteResetResult`, `StarterTemplateDef`, `OnboardingChoice`, `OnboardingOutcome` and `AuthRedirect` are exported spec contracts used only by their own module.
 - Defaults per PRD §16: lb, blue accent `#4F8CFF`, name "Lift".
 
 ## Known limitations (M6)
@@ -260,3 +291,18 @@ Last updated: 2026-11-15. Branch: `m9-sync-data`.
 - The entry chunk is about 199.5 kB gz. M10 has the bundle target.
 - The QuotaDialog can be dismissed.
 - The first workout of an exercise is never a PR (existing behaviour).
+
+## Known limitations (M10)
+- The settings document is last-write-wins. A pre-M10 device that is offline with unsynced settings can clear `onboardedAt` when it syncs.
+- The reset link opens in the browser (Safari on iOS), not the installed app. Sign in manually afterwards.
+- Default Supabase SMTP sends only a few emails per hour. The local `email_sent = 100` limit applies only to the local stack.
+- Lighthouse manual run (Performance and Best Practices at least 90, median of 3) is pending. Record the result here after the deploy.
+- Desktop Chrome with a captured install prompt reports platform `android` (copy only).
+- Deferred to post-v1: multi-tab active-workout warning, >6 h end-time prompt, History search and filter, merge import, change password while signed in, delete account.
+
+## Owner to-dos (v1 sign-off)
+- Supabase dashboard (Authentication → URL Configuration): Site URL and the redirect allow-list contain exactly `https://aarushplatti-afk.github.io/lift/`. Keep sign-ups on. Minimum password length 8. Optionally turn off Confirm email.
+- Make the CI `integration` job a required check after its first green run on `main`.
+- Run the manual device checklist (README, Manual device checklist).
+- Run Lighthouse mobile on the deployed URL and record Performance and Best Practices above.
+- v1 is pending owner sign-off.

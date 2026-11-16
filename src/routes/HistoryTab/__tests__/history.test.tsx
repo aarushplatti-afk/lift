@@ -103,7 +103,7 @@ describe('History list', () => {
     renderAt('/history');
     const headings = await screen.findAllByRole('heading', { level: 2 });
     expect(headings.map((h) => h.textContent)).toEqual(['November 2026', 'October 2026']);
-    const row = screen.getByRole('link', { name: 'Newer, Thu, Nov 12' });
+    const row = screen.getByRole('link', { name: 'Newer, Thu, Nov 12, 1 PR, 1,102 lb' });
     expect(row).toHaveAttribute('href', '/history/b');
     expect(within(row).getByText('Thu, Nov 12 · 45m')).toBeInTheDocument();
     expect(within(row).getByText('1,102 lb · 1 exercise')).toBeInTheDocument();
@@ -233,7 +233,9 @@ describe('History list rows', () => {
     const plain = bench('plain', 'Plain', new Date(2026, 10, 10, 18).getTime(), benchId, 50, false);
     await db.workouts.bulkPut([big, plain]);
     renderFull('/history');
-    const bigRow = await screen.findByRole('link', { name: 'Big Day, Thu, Nov 12' });
+    const bigRow = await screen.findByRole('link', {
+      name: 'Big Day, Thu, Nov 12, 1 PR, 12,346 lb',
+    });
     expect(within(bigRow).getByText('Thu, Nov 12 · 45m')).toBeInTheDocument();
     expect(within(bigRow).getByText('12,346 lb · 3 exercises')).toBeInTheDocument();
     expect(within(bigRow).getByLabelText('1 personal record')).toBeInTheDocument();
@@ -322,7 +324,7 @@ describe('Editing history updates PR badges', () => {
     expect(headings.map((h) => h.textContent)).toEqual(['November 2026', 'October 2026']);
     const october = headings[1]?.parentElement;
     if (!october) throw new Error('missing October group');
-    expect(within(october).getByRole('link', { name: 'W1, Mon, Oct 5' })).toBeInTheDocument();
+    expect(within(october).getByRole('link', { name: /^W1, Mon, Oct 5/ })).toBeInTheDocument();
     expect(screen.queryAllByLabelText(/personal record/)).toHaveLength(0);
     expect((await db.workouts.get('w1'))?.startedAt).toBe(new Date(2026, 9, 5, 18).getTime());
   });

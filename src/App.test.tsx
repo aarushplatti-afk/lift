@@ -27,6 +27,7 @@ vi.mock('./sync/auth', () => ({
   PASSWORD_MIN_LENGTH: 8,
   signUp: vi.fn(() => Promise.resolve({ ok: true, needsConfirmation: false })),
   signIn: vi.fn(() => Promise.resolve({ ok: true })),
+  requestPasswordReset: vi.fn(() => Promise.resolve({ ok: true })),
   getCachedSession: vi.fn(() => new Promise(() => undefined)),
   onAuthChange: () => () => undefined,
 }));
@@ -102,7 +103,9 @@ describe('App gate', () => {
     render(<App />);
     expect(screen.getByRole('navigation', { name: 'Main' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Settings' }));
-    expect(screen.getByRole('heading', { name: 'Settings', level: 1 })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Settings', level: 1 }, { timeout: 5000 }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Main' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
   });

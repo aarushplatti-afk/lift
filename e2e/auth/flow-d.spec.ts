@@ -1,4 +1,5 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
+import { expect, test } from '../fixtures';
 import { bodyweightId } from '../../src/lib/ids';
 import {
   createUser,
@@ -246,9 +247,7 @@ test('Flow D: bodyweight log, upsert, delete, re-log, offline, goal and two devi
 
     await setWeight(page2, '175');
     await page2.getByRole('button', { name: 'Update', exact: true }).click();
-    await expect
-      .poll(async () => (await remoteFor(user, today))[0]?.weight_kg, POLL)
-      .toBe(79.379);
+    await expect.poll(async () => (await remoteFor(user, today))[0]?.weight_kg, POLL).toBe(79.379);
 
     await syncNow(page);
     await openBodyweight(page);

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
+import { expect, test } from '../fixtures';
 import {
   createUser,
   hasSupabase,
@@ -76,8 +77,7 @@ test('Progress perf: 2000 Bench workouts @perf', async ({ page }) => {
     .poll(
       async () => {
         benchId =
-          (await readRemoteExercises(user)).find((e) => e.name === 'Barbell Bench Press')?.id ??
-          '';
+          (await readRemoteExercises(user)).find((e) => e.name === 'Barbell Bench Press')?.id ?? '';
         return benchId !== '';
       },
       { timeout: 20_000 },
@@ -99,10 +99,15 @@ test('Progress perf: 2000 Bench workouts @perf', async ({ page }) => {
     timeout: 120_000,
   });
   await page.waitForTimeout(5000);
-  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Workout' }).click();
+  await page
+    .getByRole('navigation', { name: 'Main' })
+    .getByRole('link', { name: 'Workout' })
+    .click();
 
   // First dot within 1500 ms of the tab tap (lazy chunk and chart included).
-  const tab = page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Progress' });
+  const tab = page
+    .getByRole('navigation', { name: 'Main' })
+    .getByRole('link', { name: 'Progress' });
   const t0 = Date.now();
   await tab.click();
   await dots(page).first().waitFor({ state: 'visible', timeout: 10_000 });

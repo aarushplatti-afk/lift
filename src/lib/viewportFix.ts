@@ -80,12 +80,3 @@ export function installViewportFix(root: HTMLElement): void {
     if (document.visibilityState === 'visible') soon();
   });
 }
-
-// Supabase's implicit flow (detectSessionInUrl is off) returns tokens in the hash,
-// which HashRouter would treat as a route; drop them from the URL and history.
-export function stripAuthRedirectHash(): void {
-  const { hash, pathname, search } = window.location;
-  if (/^#(access_token|error|error_code)=/.test(hash)) {
-    window.history.replaceState(null, '', `${pathname}${search}#/`);
-  }
-}

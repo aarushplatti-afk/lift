@@ -46,7 +46,15 @@ export function sanitizeSettings(data: SettingsData): SettingsData {
   ) {
     throw new RangeError(`bodyweightGoalKg must be between 0 and ${GOAL_MAX_KG} kg`);
   }
-  return { ...data, defaultRestSeconds: clampRestSeconds(data.defaultRestSeconds) };
+  const { onboardedAt, ...rest } = data;
+  const clean: SettingsData = {
+    ...rest,
+    defaultRestSeconds: clampRestSeconds(data.defaultRestSeconds),
+  };
+  if (Number.isInteger(onboardedAt) && onboardedAt !== undefined && onboardedAt > 0) {
+    clean.onboardedAt = onboardedAt;
+  }
+  return clean;
 }
 
 export async function getSettings(): Promise<SettingsData> {

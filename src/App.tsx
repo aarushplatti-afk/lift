@@ -1,23 +1,26 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { HashRouter, Outlet, Route, Routes, useLocation } from 'react-router-dom';
+import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { AuthGate, ConfigError } from './components/AuthGate';
 import { QuotaDialog } from './components/QuotaDialog';
 import { UpdateToast } from './components/UpdateToast';
 import { ChunkErrorBoundary } from './components/ui/ChunkErrorBoundary';
 import { TabBar } from './components/ui/TabBar';
 import { ToastHost } from './components/ui/Toast';
+import { useToastStore } from './components/ui/toastStore';
 import { WorkoutMiniBar } from './components/workout/WorkoutMiniBar';
+import { OnboardingGate } from './routes/Onboarding/OnboardingGate';
 import { ExerciseDetail } from './routes/ExercisesTab/ExerciseDetail';
 import { ExerciseFormPage } from './routes/ExercisesTab/ExerciseFormPage';
 import { ExerciseList } from './routes/ExercisesTab/ExerciseList';
 import { HistoryList } from './routes/HistoryTab/HistoryList';
 import { WorkoutDetail } from './routes/HistoryTab/WorkoutDetail';
 import { WorkoutEditor } from './routes/HistoryTab/WorkoutEditor';
-import { SettingsPage } from './routes/SettingsPage';
 import { ActiveWorkout } from './routes/WorkoutTab/ActiveWorkout';
 import { Summary } from './routes/WorkoutTab/Summary';
 import { TemplateEditor } from './routes/WorkoutTab/Templates/TemplateEditor';
 import { WorkoutHome } from './routes/WorkoutTab/WorkoutHome';
+import { clearAuthRedirect, getAuthRedirect, type RecoveryTokens } from './lib/authRedirect';
 import { isSupabaseConfigured, getSupabase } from './lib/supabase';
 import { applyTheme } from './lib/theme';
 import { useAuthStore } from './store/auth';
@@ -31,6 +34,25 @@ import { startSyncTriggers } from './sync/triggers';
 const ProgressTab = lazy(() =>
   import('./routes/ProgressTab/ProgressTab').then((m) => ({ default: m.ProgressTab })),
 );
+
+const SettingsPage = lazy(() =>
+  import('./routes/SettingsPage').then((m) => ({ default: m.SettingsPage })),
+);
+
+const ResetPasswordScreen = lazy(() =>
+  import('./routes/ResetPassword/ResetPasswordScreen').then((m) => ({
+    default: m.ResetPasswordScreen,
+  })),
+);
+
+const INVALID_LINK_TOAST =
+  'This link is invalid or has expired. Request a new one from the sign-in screen.';
+const CONFIRMED_TOAST = 'Email confirmed. Sign in to continue.';
+
+function initialRecovery(): RecoveryTokens | null {
+  const redirect = getAuthRedirect();
+  return redirect?.kind === 'recovery' ? redirect.tokens : null;
+}
 
 function Layout() {
   const { pathname } = useLocation();
@@ -50,7 +72,7 @@ function Layout() {
       ? 'pb-[calc(112px+env(safe-area-inset-bottom))]'
       : 'pb-[calc(64px+env(safe-area-inset-bottom))]';
   return (
-    <div className={`pl-safe pr-safe min-h-dvh ${padding}`}>
+    <div data-app-shell className={`pl-safe pr-safe min-h-dvh ${padding}`}>
       <Outlet />
       {showMiniBar ? <WorkoutMiniBar /> : null}
       {showTabs ? <TabBar /> : null}
@@ -85,7 +107,16 @@ function Shell() {
           <Route path="exercises/new" element={<ExerciseFormPage />} />
           <Route path="exercises/:id" element={<ExerciseDetail />} />
           <Route path="exercises/:id/edit" element={<ExerciseFormPage />} />
-          <Route path="settings" element={<SettingsPage />} />
+          <Route
+            path="settings"
+            element={
+              <ChunkErrorBoundary>
+                <Suspense fallback={null}>
+                  <SettingsPage />
+                </Suspense>
+              </ChunkErrorBoundary>
+            }
+          />
         </Route>
       </Routes>
     </HashRouter>
@@ -96,6 +127,19 @@ function ConfiguredApp() {
   const status = useAuthStore((s) => s.status);
   const theme = useSettingsStore((s) => s.settings.theme);
   const hydrated = useSettingsStore((s) => s.hydrated);
+  const [recovery, setRecovery] = useState<RecoveryTokens | null>(initialRecovery);
+  const [resetEmail, setResetEmail] = useState<string | undefined>();
+
+  useEffect(() => {
+    const redirect = getAuthRedirect();
+    if (!redirect) return;
+    clearAuthRedirect();
+    if (redirect.kind === 'error') {
+      useToastStore.getState().show({ message: INVALID_LINK_TOAST });
+    } else if (redirect.kind === 'signup_confirmed') {
+      useToastStore.getState().show({ message: CONFIRMED_TOAST });
+    }
+  }, []);
 
   useEffect(() => useAuthStore.getState().init(), []);
   useEffect(() => initSettingsStore(), []);
@@ -108,9 +152,28 @@ function ConfiguredApp() {
     return startSyncTriggers(getSyncEngine(), getSupabase().auth);
   }, [status]);
 
+  if (recovery) {
+    return (
+      <ChunkErrorBoundary>
+        <Suspense fallback={null}>
+          <ResetPasswordScreen
+            tokens={recovery}
+            onDone={(email) => {
+              setResetEmail(email);
+              setRecovery(null);
+            }}
+          />
+        </Suspense>
+      </ChunkErrorBoundary>
+    );
+  }
+
   return (
-    <AuthGate>
-      <Shell />
+    <AuthGate initialEmail={resetEmail}>
+      <AppErrorBoundary>
+        <Shell />
+        <OnboardingGate />
+      </AppErrorBoundary>
     </AuthGate>
   );
 }
