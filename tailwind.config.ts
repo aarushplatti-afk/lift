@@ -27,12 +27,12 @@ export default {
         control: 'var(--radius-control)',
       },
       fontSize: {
-        caption: ['12px', '16px'],
-        'body-sm': ['14px', '20px'],
-        body: ['16px', '24px'],
-        'title-sm': ['18px', '24px'],
-        title: ['24px', '32px'],
-        stat: ['32px', '40px'],
+        caption: ['0.75rem', '1rem'],
+        'body-sm': ['0.875rem', '1.25rem'],
+        body: ['1rem', '1.5rem'],
+        'title-sm': ['1.125rem', '1.5rem'],
+        title: ['1.5rem', '2rem'],
+        stat: ['2rem', '2.5rem'],
       },
       keyframes: {
         shake: {

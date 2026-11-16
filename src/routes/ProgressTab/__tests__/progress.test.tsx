@@ -140,7 +140,7 @@ describe('Progress tab shell', () => {
     renderTab();
     expect(await screen.findByText('No workouts yet')).toBeInTheDocument();
     expect(screen.getByText('Finish a workout to see your progress here.')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Start a workout' }));
+    await userEvent.click(screen.getByRole('link', { name: 'Start a workout' }));
     expect(screen.getByText('Workout home')).toBeInTheDocument();
   });
 });

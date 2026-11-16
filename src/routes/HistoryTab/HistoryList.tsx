@@ -27,11 +27,14 @@ function HistoryRow({ workout, types, unit }: RowProps) {
   const date = formatWorkoutDate(workout.startedAt);
   const duration = stats.durationMs === undefined ? '—' : formatDurationShort(stats.durationMs);
   const count = stats.exerciseCount;
+  const prLabel =
+    stats.prCount > 0 ? `, ${String(stats.prCount)} ${plural(stats.prCount, 'PR', 'PRs')}` : '';
+  const volumeLabel = stats.volumeKg > 0 ? `, ${formatVolume(stats.volumeKg, unit)}` : '';
   return (
     <li>
       <Link
         to={`/history/${workout.id}`}
-        aria-label={`${workout.name}, ${date}`}
+        aria-label={`${workout.name}, ${date}${prLabel}${volumeLabel}`}
         className="flex min-h-[72px] flex-col justify-center gap-0.5 border-b border-border px-4 py-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent active:bg-surface-2"
       >
         <span className="flex items-center gap-2">

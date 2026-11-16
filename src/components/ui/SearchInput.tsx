@@ -29,7 +29,7 @@ export function SearchInput({ value, onChange, label, placeholder }: SearchInput
           onChange={(e) => {
             onChange(e.target.value);
           }}
-          className="min-h-tap w-full appearance-none rounded-control border border-border bg-surface-2 pl-3 pr-12 text-[16px] text-primary placeholder:text-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent [&::-webkit-search-cancel-button]:appearance-none"
+          className="min-h-tap w-full appearance-none rounded-control border border-border bg-surface-2 pl-3 pr-12 text-[max(16px,1rem)] text-primary placeholder:text-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent [&::-webkit-search-cancel-button]:appearance-none"
         />
         {value !== '' && (
           <IconButton

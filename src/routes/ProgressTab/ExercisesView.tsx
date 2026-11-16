@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { ExerciseChart } from '../../components/charts/ExerciseChart';
 import { metricLabel } from '../../components/charts/metricLabels';
-import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { listCompletedWorkouts } from '../../db/repos/workouts';
 import { useLiveQuery } from '../../hooks/useLiveQuery';
@@ -25,8 +24,11 @@ const CHART_HEIGHT = 240;
 
 function StartWorkoutAction() {
   return (
-    <Link to="/">
-      <Button>Start a workout</Button>
+    <Link
+      to="/"
+      className="inline-flex min-h-tap items-center justify-center rounded-control bg-accent px-4 text-body font-semibold text-on-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+    >
+      Start a workout
     </Link>
   );
 }

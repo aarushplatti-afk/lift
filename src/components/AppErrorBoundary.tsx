@@ -50,7 +50,7 @@ function ErrorFallback({ error }: { error: Error }) {
           aria-label="Error details"
           value={text}
           rows={6}
-          className="w-full rounded-control border border-border bg-surface-2 p-2 text-[16px] text-primary"
+          className="w-full rounded-control border border-border bg-surface-2 p-2 text-[max(16px,1rem)] text-primary"
         />
       ) : null}
       <Button

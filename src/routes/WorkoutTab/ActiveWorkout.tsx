@@ -54,7 +54,7 @@ function WorkoutTitle({ name }: { name: string }) {
       onKeyDown={(e) => {
         if (e.key === 'Enter') e.currentTarget.blur();
       }}
-      className="min-h-tap min-w-0 flex-1 truncate rounded-control bg-transparent px-2 text-[16px] font-semibold text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+      className="min-h-tap min-w-0 flex-1 truncate rounded-control bg-transparent px-2 text-[max(16px,1rem)] font-semibold text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
     />
   );
 }

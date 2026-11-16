@@ -18,7 +18,7 @@ export function TextArea({ label, error, className = '', ...rest }: TextAreaProp
         id={id}
         aria-invalid={error !== undefined}
         aria-describedby={error !== undefined ? errorId : undefined}
-        className={`min-h-[96px] rounded-control border bg-surface-2 px-3 py-2 text-[16px] text-primary placeholder:text-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+        className={`min-h-[96px] rounded-control border bg-surface-2 px-3 py-2 text-[max(16px,1rem)] text-primary placeholder:text-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
           error !== undefined ? 'border-danger' : 'border-border'
         } ${className}`}
         {...rest}

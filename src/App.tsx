@@ -69,7 +69,7 @@ function Layout() {
       ? 'pb-[calc(112px+env(safe-area-inset-bottom))]'
       : 'pb-[calc(64px+env(safe-area-inset-bottom))]';
   return (
-    <div className={`pl-safe pr-safe min-h-dvh ${padding}`}>
+    <div data-app-shell className={`pl-safe pr-safe min-h-dvh ${padding}`}>
       <Outlet />
       {showMiniBar ? <WorkoutMiniBar /> : null}
       {showTabs ? <TabBar /> : null}
