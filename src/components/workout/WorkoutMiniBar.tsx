@@ -17,6 +17,7 @@ export function WorkoutMiniBar() {
   return (
     <button
       type="button"
+      data-hide-on-keyboard
       onClick={() => {
         navigate('/workout/active');
       }}

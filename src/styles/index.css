@@ -51,3 +51,7 @@
     padding-right: env(safe-area-inset-right);
   }
 }
+
+html[data-keyboard='open'] [data-hide-on-keyboard] {
+  display: none;
+}
