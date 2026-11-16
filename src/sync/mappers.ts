@@ -137,16 +137,20 @@ const FROM_ROW: FromRowMap = {
     },
     deleted: row.deleted_at !== null,
   }),
-  user_settings: (row): MappedRecord<Settings> => ({
-    record: {
+  user_settings: (row): MappedRecord<Settings> => {
+    const { onboardedAt, ...data } = row.data as Partial<SettingsData>;
+    const record: Settings = {
       ...DEFAULT_SETTINGS,
-      ...(row.data as Partial<SettingsData>),
+      ...data,
       id: 'singleton',
       userId: row.user_id,
       updatedAt: ms(row.updated_at),
-    },
-    deleted: false,
-  }),
+    };
+    if (Number.isInteger(onboardedAt) && onboardedAt !== undefined && onboardedAt > 0) {
+      record.onboardedAt = onboardedAt;
+    }
+    return { record, deleted: false };
+  },
 };
 
 export function toRow<T extends SyncTable>(table: T, rec: SyncRecordMap[T]): TablesInsert<T> {

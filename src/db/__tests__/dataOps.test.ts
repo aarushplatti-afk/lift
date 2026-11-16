@@ -343,7 +343,7 @@ describe('clearUserDataLocal', () => {
       { key: 'lastBackupAt', value: 5 },
       { key: 'backupTrackingSince', value: 4 },
     ]);
-    await clearUserDataLocal(U, 999);
+    await clearUserDataLocal(U, 5000, 999);
     for (const t of [
       db.exercises,
       db.workouts,
@@ -376,7 +376,7 @@ describe('clearUserDataLocal', () => {
       userId: U,
       updatedAt: 1,
     });
-    await clearUserDataLocal(U, 999);
+    await clearUserDataLocal(U, 5000, 999);
     expect(await db.settings.get('singleton')).toMatchObject({ unit: 'lb', onboardedAt: 42 });
     expect(await db.syncQueue.count()).toBe(0);
   });
@@ -384,17 +384,17 @@ describe('clearUserDataLocal', () => {
   it('throws active_workout inside the transaction and clears nothing', async () => {
     await db.exercises.put(ex('e1', 'A'));
     await db.meta.put({ key: 'activeWorkoutId', value: 'w1' });
-    await expect(clearUserDataLocal(U)).rejects.toMatchObject({ reason: 'active_workout' });
+    await expect(clearUserDataLocal(U, 5000)).rejects.toMatchObject({ reason: 'active_workout' });
     expect(await db.exercises.count()).toBe(1);
   });
 
   it('is a no-op error for the wrong owner', async () => {
     await db.exercises.put(ex('e1', 'A'));
-    await expect(clearUserDataLocal('other')).rejects.toThrow(/owner/i);
+    await expect(clearUserDataLocal('other', 5000)).rejects.toThrow(/owner/i);
     expect(await db.exercises.count()).toBe(1);
   });
 
   it('works on an empty database', async () => {
-    await expect(clearUserDataLocal(U)).resolves.toBeUndefined();
+    await expect(clearUserDataLocal(U, 5000)).resolves.toBeUndefined();
   });
 });

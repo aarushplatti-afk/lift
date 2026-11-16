@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { wipeLocalData } from '../../../db/repos/meta';
 import { DEFAULT_SETTINGS } from '../../../db/repos/settings';
 import { db } from '../../../db/schema';
+import { useToastStore } from '../../../components/ui/toastStore';
 import { useSettingsStore } from '../../../store/settings';
 import { OnboardingGate } from '../OnboardingGate';
 
@@ -62,6 +63,27 @@ describe('OnboardingGate', () => {
     render(<OnboardingGate />);
     await act(() => new Promise((r) => setTimeout(r, 50)));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('closes when onboardedAt is set externally', async () => {
+    render(<OnboardingGate />);
+    await screen.findByRole('dialog');
+    act(() => {
+      useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, onboardedAt: 7 } });
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+  });
+
+  it('shows a toast when starter templates could not be added', async () => {
+    complete.mockResolvedValue({ bodyweightSaved: false, templatesAdded: 0 });
+    render(<OnboardingGate />);
+    await screen.findByRole('dialog');
+    await userEvent.click(screen.getByRole('button', { name: 'Get started' }));
+    await waitFor(() => {
+      expect(useToastStore.getState().toast?.message).toMatch(/starter templates/);
+    });
   });
 
   it('Get started saves unit, weight and templates', async () => {

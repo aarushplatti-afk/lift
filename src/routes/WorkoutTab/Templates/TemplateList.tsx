@@ -90,7 +90,10 @@ export function TemplateList() {
     try {
       const added = await addStarterTemplates();
       useToastStore.getState().show({
-        message: added > 0 ? 'Starter templates added' : 'Starter exercises not found',
+        message:
+          added > 0
+            ? 'Starter templates added'
+            : 'Couldn’t add starter templates. Try again after sync.',
       });
     } catch {
       useToastStore.getState().show({ message: SAVE_FAILED });

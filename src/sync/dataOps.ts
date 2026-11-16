@@ -190,7 +190,7 @@ export function createDataOps(deps: {
           } catch {
             throw new ServerDeleteError();
           }
-          await clearUserDataLocal(owner.userId, onboardedAt);
+          await clearUserDataLocal(owner.userId, now(), onboardedAt);
         });
       } catch (err) {
         if (err instanceof ServerDeleteError) return failure('server_error');

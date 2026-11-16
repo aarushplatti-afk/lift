@@ -332,6 +332,24 @@ describe('deleteAllData', () => {
     expect(await db.syncQueue.count()).toBe(0);
   });
 
+  it('keeps an existing onboardedAt in the server payload and local settings', async () => {
+    const EXISTING = 1_700_000_000_000;
+    await db.settings.put({
+      ...DEFAULT_SETTINGS,
+      onboardedAt: EXISTING,
+      id: 'singleton',
+      userId: U,
+      updatedAt: 1,
+    });
+    const result = await ops.deleteAllData('DELETE');
+    expect(result).toEqual({ ok: true, failed: 0 });
+    expect(server.tables.user_settings[0]?.data).toEqual({
+      ...DEFAULT_SETTINGS,
+      onboardedAt: EXISTING,
+    });
+    expect((await db.settings.get('singleton'))?.onboardedAt).toBe(EXISTING);
+  });
+
   it('leaves local data and the outbox untouched when the third table fails', async () => {
     await saveLocalExercise('local');
     await db.workouts.put(workout('w1'));

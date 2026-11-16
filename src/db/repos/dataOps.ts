@@ -139,7 +139,11 @@ export async function replaceAllLocal(
   );
 }
 
-export function clearUserDataLocal(userId: string, onboardedAtFallback?: number): Promise<void> {
+export function clearUserDataLocal(
+  userId: string,
+  now: number,
+  onboardedAtFallback?: number,
+): Promise<void> {
   return db.transaction(
     'rw',
     [
@@ -156,7 +160,6 @@ export function clearUserDataLocal(userId: string, onboardedAtFallback?: number)
       await assertOwner(userId);
       if (await hasActiveWorkout()) throw new DataOpBlockedError('active_workout');
       const current = await getSettings();
-      const now = Date.now();
       const onboardedAt = current.onboardedAt ?? onboardedAtFallback ?? now;
       await Promise.all([
         db.exercises.clear(),

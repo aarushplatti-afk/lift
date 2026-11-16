@@ -7,6 +7,7 @@ const begin = vi.hoisted(() => vi.fn());
 const complete = vi.hoisted(() => vi.fn());
 vi.mock('../../sync/auth', () => ({
   PASSWORD_MIN_LENGTH: 8,
+  abandonPasswordReset: vi.fn(() => Promise.resolve()),
   beginPasswordReset: begin,
   completePasswordReset: complete,
 }));

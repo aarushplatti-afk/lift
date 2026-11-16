@@ -28,7 +28,7 @@ export function OnboardingGate() {
     if (show && !closed.current) setOpen(true);
   }, [show]);
 
-  if (!open) return null;
+  if (!open || onboardedAt !== undefined) return null;
   return (
     <Suspense fallback={null}>
       <WelcomeSheet

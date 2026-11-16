@@ -3,6 +3,7 @@ import { installKeyboardHandling, isKeyboardOpen } from '../keyboard';
 
 class FakeVV extends EventTarget {
   height = 800;
+  offsetTop = 0;
 }
 
 describe('isKeyboardOpen', () => {
@@ -51,6 +52,27 @@ describe('installKeyboardHandling', () => {
     input.getBoundingClientRect = () => ({ top: 600, bottom: 640 }) as DOMRect;
     vv.dispatchEvent(new Event('resize'));
     expect(spy).toHaveBeenCalledWith({ block: 'center' });
+    off();
+  });
+
+  it('accounts for visualViewport.offsetTop', () => {
+    const input = document.createElement('input');
+    document.body.append(input);
+    const spy = vi.fn();
+    input.scrollIntoView = spy;
+    input.focus();
+    const off = installKeyboardHandling();
+    vv.height = 450;
+    vv.offsetTop = 200;
+    input.getBoundingClientRect = () => ({ top: 300, bottom: 340 }) as DOMRect;
+    vv.dispatchEvent(new Event('resize'));
+    expect(spy).not.toHaveBeenCalled();
+    input.getBoundingClientRect = () => ({ top: 150, bottom: 190 }) as DOMRect;
+    vv.dispatchEvent(new Event('resize'));
+    expect(spy).toHaveBeenCalledTimes(1);
+    input.getBoundingClientRect = () => ({ top: 620, bottom: 660 }) as DOMRect;
+    vv.dispatchEvent(new Event('resize'));
+    expect(spy).toHaveBeenCalledTimes(2);
     off();
   });
 

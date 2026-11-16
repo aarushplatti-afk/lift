@@ -22,7 +22,8 @@ export function installKeyboardHandling(): () => void {
     const el = document.activeElement;
     if (!isEditable(el)) return;
     const rect = el.getBoundingClientRect();
-    if (rect.bottom > vv.height || rect.top < 0) {
+    const top = vv.offsetTop;
+    if (rect.bottom > top + vv.height || rect.top < top) {
       el.scrollIntoView({ block: 'center' });
     }
   };

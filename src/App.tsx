@@ -16,7 +16,6 @@ import { ExerciseList } from './routes/ExercisesTab/ExerciseList';
 import { HistoryList } from './routes/HistoryTab/HistoryList';
 import { WorkoutDetail } from './routes/HistoryTab/WorkoutDetail';
 import { WorkoutEditor } from './routes/HistoryTab/WorkoutEditor';
-import { SettingsPage } from './routes/SettingsPage';
 import { ActiveWorkout } from './routes/WorkoutTab/ActiveWorkout';
 import { Summary } from './routes/WorkoutTab/Summary';
 import { TemplateEditor } from './routes/WorkoutTab/Templates/TemplateEditor';
@@ -34,6 +33,10 @@ import { startSyncTriggers } from './sync/triggers';
 
 const ProgressTab = lazy(() =>
   import('./routes/ProgressTab/ProgressTab').then((m) => ({ default: m.ProgressTab })),
+);
+
+const SettingsPage = lazy(() =>
+  import('./routes/SettingsPage').then((m) => ({ default: m.SettingsPage })),
 );
 
 const ResetPasswordScreen = lazy(() =>
@@ -104,7 +107,16 @@ function Shell() {
           <Route path="exercises/new" element={<ExerciseFormPage />} />
           <Route path="exercises/:id" element={<ExerciseDetail />} />
           <Route path="exercises/:id/edit" element={<ExerciseFormPage />} />
-          <Route path="settings" element={<SettingsPage />} />
+          <Route
+            path="settings"
+            element={
+              <ChunkErrorBoundary>
+                <Suspense fallback={null}>
+                  <SettingsPage />
+                </Suspense>
+              </ChunkErrorBoundary>
+            }
+          />
         </Route>
       </Routes>
     </HashRouter>

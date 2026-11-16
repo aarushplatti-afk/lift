@@ -252,6 +252,13 @@ export async function beginPasswordReset(tokens: RecoveryTokens): Promise<BeginR
   }
 }
 
+export async function abandonPasswordReset(): Promise<void> {
+  const client = recoveryClient;
+  recoveryClient = undefined;
+  if (!client) return;
+  await client.auth.signOut({ scope: 'local' }).catch(() => undefined);
+}
+
 export async function completePasswordReset(newPassword: string): Promise<CompleteResetResult> {
   if (newPassword.length < PASSWORD_MIN_LENGTH) {
     return {

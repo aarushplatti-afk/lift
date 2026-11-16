@@ -4,7 +4,12 @@ import { Button } from '../../components/ui/Button';
 import { TextInput } from '../../components/ui/TextInput';
 import { useInstallPrompt } from '../../hooks/useInstallPrompt';
 import type { RecoveryTokens } from '../../lib/authRedirect';
-import { beginPasswordReset, completePasswordReset, PASSWORD_MIN_LENGTH } from '../../sync/auth';
+import {
+  abandonPasswordReset,
+  beginPasswordReset,
+  completePasswordReset,
+  PASSWORD_MIN_LENGTH,
+} from '../../sync/auth';
 
 interface ResetPasswordScreenProps {
   tokens: RecoveryTokens;
@@ -73,6 +78,7 @@ export function ResetPasswordScreen({ tokens, onDone }: ResetPasswordScreenProps
           size="lg"
           fullWidth
           onClick={() => {
+            void abandonPasswordReset();
             onDone(undefined);
           }}
         >
@@ -95,6 +101,7 @@ export function ResetPasswordScreen({ tokens, onDone }: ResetPasswordScreenProps
           variant="secondary"
           fullWidth
           onClick={() => {
+            void abandonPasswordReset();
             onDone(undefined);
           }}
         >

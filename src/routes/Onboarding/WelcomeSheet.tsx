@@ -18,6 +18,7 @@ const UNIT_OPTIONS: readonly { value: Unit; label: string }[] = [
   { value: 'kg', label: 'kg' },
 ];
 
+const TEMPLATES_FAILED = 'Couldn’t add starter templates. You can add them later from Templates.';
 const SAVE_FAILED = 'Couldn’t save. Try again.';
 
 interface WelcomeSheetProps {
@@ -52,7 +53,16 @@ export function WelcomeSheet({ onDone }: WelcomeSheetProps) {
   const run = async (action: () => Promise<unknown>) => {
     setSaving(true);
     try {
-      await action();
+      const result = await action();
+      if (
+        addTemplates &&
+        typeof result === 'object' &&
+        result !== null &&
+        'templatesAdded' in result &&
+        result.templatesAdded === 0
+      ) {
+        useToastStore.getState().show({ message: TEMPLATES_FAILED });
+      }
       onDone();
     } catch {
       useToastStore.getState().show({ message: SAVE_FAILED });
